@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "tree-sitter>=0.22,<0.27",
     "tree-sitter-java>=0.21",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]

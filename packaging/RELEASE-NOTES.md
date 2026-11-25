@@ -21,25 +21,25 @@ CycloneDX/SPDX SBOM, OpenVEX.
    Требования: Linux x86_64, glibc >= 2.35 (Debian 12+, Ubuntu 22.04+,
    Astra Linux 1.8+, ALT 10+, ROSA 2021+).
 
-2. Для Debian/Astra: argus-scanner_1.1.0-3_all.deb
-   Универсальный пакет, Architecture: all, 238 КБ. При установке создаёт
+2. Для Debian/Astra: argus-scanner_1.1.0-4_all.deb
+   Универсальный пакет, Architecture: all, 242 КБ. При установке создаёт
    приватный runtime в /var/lib/argus-scanner и скачивает актуальный
    Semgrep с PyPI. Нужны сеть (или wheelhouse) и python3 >= 3.10.
 
-     sudo apt install ./argus-scanner_1.1.0-3_all.deb
+     sudo apt install ./argus-scanner_1.1.0-4_all.deb
      argus scan /path/to/repo -f sarif -o argus.sarif
 
-3. Исходники: argus-scanner_1.1.0-3.dsc, orig.tar.gz, debian.tar.xz
+3. Исходники: argus-scanner_1.1.0-4.dsc, orig.tar.gz, debian.tar.xz
    Сборка: dpkg-source -x ...dsc && cd argus-scanner-1.1.0 &&
            dpkg-buildpackage -us -uc -b
 
 Артефакты
 ---------
   argus-1.1.0-linux-x86_64.tar.gz          121 МБ  портативный архив
-  argus-scanner_1.1.0-3_all.deb            238 КБ  универсальный .deb
-  argus-scanner_1.1.0-3.dsc                        source package
-  argus-scanner_1.1.0.orig.tar.gz          231 КБ  исходники
-  argus-scanner_1.1.0-3.debian.tar.xz      9,7 КБ  debian/
+  argus-scanner_1.1.0-4_all.deb            242 КБ  универсальный .deb
+  argus-scanner_1.1.0-4.dsc                        source package
+  argus-scanner_1.1.0.orig.tar.gz          255 КБ  исходники
+  argus-scanner_1.1.0-4.debian.tar.xz       10 КБ  debian/
   SHA256SUMS                                       контрольные суммы
 
 Проверка
@@ -53,7 +53,8 @@ CycloneDX/SPDX SBOM, OpenVEX.
   * поиск секретов, IaC-проверки, baseline и подавления;
   * форматы text/json/sarif/md/sbom/vex, quality gates, EPSS/KEV;
   * портативный архив с собственным CPython — не зависит от системы;
-  * универсальный .deb ставит актуальный Semgrep при установке.
+  * универсальный .deb ставит актуальный Semgrep при установке;
+  * чтение TOML-конфига и подавлений на Python 3.10 (tomli).
 
 Лицензия
 --------

@@ -1,3 +1,12 @@
+argus-scanner (1.1.0-4) unstable; urgency=medium
+
+  * Use tomli for TOML configuration files on Python 3.10 (tomllib exists
+    from 3.11 only).  This fixes suppression lists and project config on
+    the minimum supported interpreter.
+  * Declare tomli as a conditional dependency in pyproject.toml.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>  Thu, 26 Nov 2026 10:00:00 +0300
+
 argus-scanner (1.1.0-3) unstable; urgency=medium
 
   * Make the binary package architecture independent (Architecture: all,

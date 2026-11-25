@@ -9,7 +9,7 @@
 
 - Портативный архив `argus-1.1.0-linux-x86_64.tar.gz`: собственный CPython
   3.11 и Semgrep, запуск без root, pip и системного Python.
-- Универсальный Debian-пакет `argus-scanner_1.1.0-3_all.deb`
+- Универсальный Debian-пакет `argus-scanner_1.1.0-4_all.deb`
   (`Architecture: all`): при установке создаёт приватный runtime в
   `/var/lib/argus-scanner` и ставит актуальный Semgrep с PyPI.
 - `argus-setup-runtime` — установка, обновление, закрепление версии,
@@ -33,6 +33,9 @@
 
 ### Исправлено
 
+- Чтение TOML-конфига на Python 3.10: добавлена зависимость `tomli`
+  (в 3.11+ используется стандартный `tomllib`), исправлены падавшие тесты
+  `test_config`, `test_suppress`, `test_workflow`.
 - Semgrep на минимальных системах без `ca-certificates`: портативный архив
   подставляет `certifi` через `SSL_CERT_FILE`.
 - Лаунчеры портативного архива работают через симлинк и после переноса
@@ -43,5 +46,6 @@
 - `argus-scanner_1.1.0-1` — первый Debian-пакет с вендорингом зависимостей.
 - `argus-scanner_1.1.0-2` — добавлено обновление Semgrep при установке.
 - `argus-scanner_1.1.0-3` — универсальный пакет без вендоринга.
+- `argus-scanner_1.1.0-4` — исправление TOML на Python 3.10 (`tomli`).
 
 [1.1.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.1.0

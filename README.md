@@ -152,7 +152,7 @@ Debian/Astra — универсальный пакет (Architecture: all, пр�
 скачивает актуальный Semgrep с PyPI):
 
 ```bash
-sudo apt install ./argus-scanner_1.1.0-3_all.deb
+sudo apt install ./argus-scanner_1.1.0-4_all.deb
 ```
 
 Ссылки на файлы — в разделе [Releases](../../releases/latest).

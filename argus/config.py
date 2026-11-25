@@ -192,11 +192,12 @@ class Config:
 
 
 def _minimal_toml(text: str) -> Dict[str, Any]:
-    """Parse the small TOML subset used by argus on Python without ``tomllib``.
+    """Parse the small TOML subset used when neither ``tomllib`` nor ``tomli`` is available.
 
     Supported: comments, ``[table]``/``[[array]]`` headers, bare and quoted
     keys, strings, integers, floats, booleans, arrays and inline tables.  This
-    keeps Python 3.9 usable without adding a third-party dependency.
+    is a last-resort fallback: Python 3.11+ provides ``tomllib`` and 3.10
+    installs ``tomli`` through the declared dependency.
     """
     root: Dict[str, Any] = {}
     current: Dict[str, Any] = root
@@ -349,8 +350,11 @@ def parse_text(text: str, path: str = "<memory>") -> Dict[str, Any]:
         return data
     try:
         import tomllib  # type: ignore[import-not-found]
-    except ModuleNotFoundError:  # pragma: no cover - Python 3.9/3.10
-        return _minimal_toml(text)
+    except ModuleNotFoundError:  # Python 3.10
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ModuleNotFoundError:  # pragma: no cover - minimal installs
+            return _minimal_toml(text)
     try:
         return tomllib.loads(text)
     except Exception as exc:  # tomllib.TOMLDecodeError lives in a private module

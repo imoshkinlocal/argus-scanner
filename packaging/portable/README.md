@@ -92,6 +92,6 @@ libXrender). CLI работает без них.
 
 Другие способы установки
 ------------------------
-  * Debian/Astra: argus-scanner_1.1.0-3_all.deb (системная установка,
+  * Debian/Astra: argus-scanner_1.1.0-4_all.deb (системная установка,
     semgrep скачивается при установке);
   * офлайн .deb 58 МБ: только amd64 + Python 3.11 (legacy 1.1.0-2).
