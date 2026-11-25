@@ -1,8 +1,11 @@
 name: release
 
 # Publishes a GitHub Release with:
-#   * argus-<version>-linux-x86_64.tar.gz  - portable archive (own CPython + Semgrep)
-#   * argus-scanner_<version>_all.deb      - universal Debian package
+#   * argus-<version>-linux-x86_64.tar.gz   - portable archive (own CPython + Semgrep)
+#   * argus-scanner_<version>_all.deb       - universal Debian package
+#   * argus-scanner_<version>-<rev>.dsc     - Debian source package
+#     argus-scanner_<version>.orig.tar.gz
+#     argus-scanner_<version>-<rev>.debian.tar.xz
 #   * SHA256SUMS
 #
 # No repository secrets are needed.  The workflow uses the automatic
@@ -76,6 +79,7 @@ jobs:
           # match its ABI (cp311), not the runner's Python.  The glob must stay
           # unquoted so the shell expands it.
           "$B/python/bin/python3.11" -m pip install --no-cache-dir --no-compile \
+            -c packaging/portable/constraints.txt \
             --target "$B/runtime" wheelhouse/argus_scanner-*.whl \
             "semgrep==$SEMGREP_VERSION"
 
@@ -111,11 +115,34 @@ jobs:
           ls -l ../argus-scanner_*.deb
           cp ../argus-scanner_*.deb staging/
 
+      - name: Build the Debian source package
+        run: |
+          set -eux
+          # dpkg-source expects the orig tarball next to a tree named
+          # <source>-<version> and will not create it from the checkout,
+          # whose directory name does not match.  Export the commit into
+          # the expected layout instead.
+          TMP="$(mktemp -d)"
+          mkdir -p "$TMP/src" "$TMP/orig"
+          git archive --prefix="argus-scanner-$VERSION/" HEAD | tar -x -C "$TMP/src"
+          git archive --prefix="argus-scanner-$VERSION/" HEAD | tar -x -C "$TMP/orig"
+          rm -rf "$TMP/orig/argus-scanner-$VERSION/debian"
+          tar -C "$TMP/orig" -czf "$TMP/argus-scanner_$VERSION.orig.tar.gz" \
+            "argus-scanner-$VERSION"
+          cp "$TMP/argus-scanner_$VERSION.orig.tar.gz" "$TMP/src/"
+          ( cd "$TMP/src/argus-scanner-$VERSION" && dpkg-buildpackage -S -us -uc -d )
+          cp "$TMP/src"/argus-scanner_"$VERSION"-*.dsc \
+             "$TMP/src"/argus-scanner_"$VERSION"-*.debian.tar.xz \
+             "$TMP/argus-scanner_$VERSION.orig.tar.gz" staging/
+          rm -rf "$TMP"
+
       - name: Checksums
         run: |
           set -eux
           cd staging
-          sha256sum "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb > SHA256SUMS
+          sha256sum "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb \
+            argus-scanner_*.dsc argus-scanner_*.orig.tar.gz \
+            argus-scanner_*.debian.tar.xz > SHA256SUMS
           cat SHA256SUMS
 
       - name: Publish the release
@@ -127,9 +154,13 @@ jobs:
           cd staging
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" --clobber \
-              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb SHA256SUMS
+              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb \
+              argus-scanner_*.dsc argus-scanner_*.orig.tar.gz \
+              argus-scanner_*.debian.tar.xz SHA256SUMS
           else
             gh release create "$TAG" --title "argus $VERSION" \
               --notes-file ../packaging/RELEASE-NOTES.md \
-              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb SHA256SUMS
+              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb \
+              argus-scanner_*.dsc argus-scanner_*.orig.tar.gz \
+              argus-scanner_*.debian.tar.xz SHA256SUMS
           fi

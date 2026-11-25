@@ -1,0 +1,13 @@
+# Constraints for the portable archive build.
+#
+# Semgrep 1.187.0 depends on opentelemetry packages through "~=0.58b0"
+# ranges, and pip spends a minute or two backtracking over 0.66b2, 0.66b1,
+# 0.65b0 ... before it settles on 0.58b0.  Pinning the resolved set keeps
+# the portable build fast and the dependency list identical between runs.
+opentelemetry-api==1.37.0
+opentelemetry-instrumentation==0.58b0
+opentelemetry-instrumentation-requests==0.58b0
+opentelemetry-instrumentation-threading==0.58b0
+opentelemetry-semantic-conventions==0.58b0
+opentelemetry-sdk==1.37.0
+opentelemetry-util-http==0.58b0
