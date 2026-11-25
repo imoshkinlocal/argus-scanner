@@ -111,11 +111,9 @@ jobs:
           set -eux
           # dpkg-buildpackage writes the .deb to the parent of the source
           # tree, one level above the checkout.  Move it next to the archive.
-          #
-          # Ubuntu 22.04 compresses packages with zstd by default; older dpkg
-          # releases (Astra 1.8) cannot read that, and lintian flags it, so
-          # pin xz explicitly.
-          dpkg-buildpackage -us -uc -b -Zxz
+          # debian/rules pins xz compression; Ubuntu's dpkg-deb would use
+          # zstd, which old dpkg releases cannot read.
+          dpkg-buildpackage -us -uc -b
           ls -l ../argus-scanner_*.deb
           cp ../argus-scanner_*.deb staging/
 
@@ -146,6 +144,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends lintian
           lintian --tag-display-limit 0 --fail-on error \
             staging/argus-scanner_*.deb staging/argus-scanner_*.dsc
+          # Lintian on Ubuntu accepts zstd members, but dpkg before 1.21.18
+          # does not.  Check the archive layout explicitly.
+          ar t staging/argus-scanner_*.deb
+          ar t staging/argus-scanner_*.deb | grep -qx control.tar.xz
+          ar t staging/argus-scanner_*.deb | grep -qx data.tar.xz
 
       - name: Checksums
         run: |
