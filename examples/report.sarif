@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "argus",
+          "version": "1.1.0",
+          "informationUri": "https://example.invalid/argus",
+          "rules": [
+            {
+              "id": "java-sqli-jdbc",
+              "name": "java_sqli_jdbc",
+              "shortDescription": {
+                "text": "SQL injection: attacker controlled data in a JDBC statement"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "cwe/89"
+                ],
+                "precision": "medium",
+                "security-severity": "8.0",
+                "kind": "sast"
+              },
+              "fullDescription": {
+                "text": "SQL injection: attacker controlled data in a JDBC statement"
+              }
+            },
+            {
+              "id": "python-command-injection",
+              "name": "python_command_injection",
+              "shortDescription": {
+                "text": "A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "cwe/78"
+                ],
+                "precision": "high",
+                "security-severity": "8.0",
+                "kind": "sast"
+              }
+            }
+          ]
+        }
+      },
+      "originalUriBaseIds": {
+        "%SRCROOT%": {
+          "uri": "examples/vulnerable/"
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-11-25T21:18:36Z",
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "java-sqli-jdbc",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "Untrusted data reaches `st.executeQuery(\"SELECT * FROM users WHERE id = \" + id)`. Data originates from request.getParameter."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "Vulnerable.java",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 7,
+                  "snippet": {
+                    "text": "        String id = request.getParameter(\"id\");\n        java.sql.Statement st = null;\n        st.executeQuery(\"SELECT * FROM users WHERE id = \" + id);\n    }\n}"
+                  },
+                  "contextRegion": {
+                    "startLine": 7,
+                    "endLine": 11,
+                    "snippet": {
+                      "text": "        String id = request.getParameter(\"id\");\n        java.sql.Statement st = null;\n        st.executeQuery(\"SELECT * FROM users WHERE id = \" + id);\n    }\n}"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/v1": "f90423d4713457714300d22197dc49c7",
+            "argus/stable": "sast|java-sqli-jdbc|Vulnerable.java|untrusted data reaches `st.executequery(\"select * from users where id = \" + id)`. data originates from request.getparameter."
+          },
+          "properties": {
+            "kind": "sast",
+            "severity": "high",
+            "confidence": "medium",
+            "cwe": "CWE-89",
+            "cwe_name": "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+            "remediation": [
+              "Use a prepared statement with bound parameters instead of string concatenation.",
+              "Используйте параметризованные запросы и prepared statements.",
+              "Применяйте ORM или query builder с плейсхолдерами."
+            ]
+          }
+        },
+        {
+          "ruleId": "python-command-injection",
+          "ruleIndex": 1,
+          "level": "error",
+          "message": {
+            "text": "A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every argument."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 4,
+                  "snippet": {
+                    "text": "def run(cmd):\n    \"\"\"Выполняет команду, собранную из недоверенной строки.\"\"\"\n    return subprocess.call(cmd, shell=True)"
+                  },
+                  "contextRegion": {
+                    "startLine": 4,
+                    "endLine": 6,
+                    "snippet": {
+                      "text": "def run(cmd):\n    \"\"\"Выполняет команду, собранную из недоверенной строки.\"\"\"\n    return subprocess.call(cmd, shell=True)"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/v1": "5783bdddd6cfd2aa9b525a4bf6704850",
+            "argus/stable": "sast|python-command-injection|app.py|a shell command is built from a string. use `subprocess.run` with an argument list and `shell=false`, and validate every argument."
+          },
+          "properties": {
+            "kind": "sast",
+            "severity": "high",
+            "confidence": "high",
+            "cwe": "CWE-78",
+            "cwe_name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+            "remediation": [
+              "Pass an argument list to ProcessBuilder and never invoke a shell.",
+              "Не вызывайте оболочку; передавайте аргументы списком без shell=True.",
+              "Разрешайте только фиксированный набор команд и аргументов."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

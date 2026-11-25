@@ -1,0 +1,22 @@
+HIGH               java-sqli-jdbc
+    at: Vulnerable.java:9
+    cwe: CWE-89 (Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection'))
+    Untrusted data reaches `st.executeQuery("SELECT * FROM users WHERE id = " + id)`. Data originates from request.getParameter.
+          7 |         String id = request.getParameter("id");
+          8 |         java.sql.Statement st = null;
+    >     9 |         st.executeQuery("SELECT * FROM users WHERE id = " + id);
+         10 |     }
+         11 | }
+    fix: Use a prepared statement with bound parameters instead of string concatenation.
+
+HIGH               python-command-injection
+    at: app.py:6
+    cwe: CWE-78 (Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection'))
+    A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every argument.
+          4 | def run(cmd):
+          5 |     """Выполняет команду, собранную из недоверенной строки."""
+    >     6 |     return subprocess.call(cmd, shell=True)
+    fix: Pass an argument list to ProcessBuilder and never invoke a shell.
+
+Summary: critical: 0, high: 2, medium: 0, low: 0, info: 0, total: 2
+

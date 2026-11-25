@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json.schemastore.org/argus-report-1.1.json",
+  "schema_version": "1.1",
+  "generated_at": "2026-11-25T21:18:33Z",
+  "tool": {
+    "name": "argus",
+    "version": "1.1.0",
+    "url": "https://example.invalid/argus",
+    "engines": [
+      "argus-java",
+      "semgrep"
+    ]
+  },
+  "target": "examples/vulnerable",
+  "summary": {
+    "total": 2,
+    "all": 2,
+    "suppressed": 0,
+    "new": 0,
+    "existing": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 2,
+      "medium": 0,
+      "low": 0,
+      "info": 0,
+      "unknown": 0
+    },
+    "by_kind": {
+      "sast": 2,
+      "sca": 0
+    },
+    "by_engine": {
+      "argus-java": 1,
+      "semgrep": 1
+    },
+    "by_ecosystem": {},
+    "packages": 0,
+    "packages_direct": 0,
+    "packages_transitive": 0,
+    "packages_unknown": 0,
+    "dependency_graph": false,
+    "max_severity": "high",
+    "errors": 0,
+    "status": "findings",
+    "top_rules": [
+      {
+        "rule_id": "java-sqli-jdbc",
+        "kind": "sast",
+        "severity": "high",
+        "count": 1
+      },
+      {
+        "rule_id": "python-command-injection",
+        "kind": "sast",
+        "severity": "high",
+        "count": 1
+      }
+    ]
+  },
+  "stats": {
+    "sast_cache": {
+      "hits": 1,
+      "misses": 0,
+      "stored": 0
+    },
+    "secrets": {
+      "files_scanned": 2,
+      "files_skipped": 0,
+      "findings": 0,
+      "rules": 0
+    },
+    "iac": {
+      "root": "examples/vulnerable",
+      "files_scanned": 0,
+      "files_skipped": 0,
+      "files_excluded": 0,
+      "directories_skipped": 0,
+      "findings": 0,
+      "by_severity": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "info": 0,
+        "unknown": 0
+      },
+      "by_rule": {}
+    },
+    "files_total": 2,
+    "files_java": 1,
+    "files_other": 1,
+    "engine": "auto",
+    "include_suppressed": false,
+    "workflow": {
+      "baseline": "",
+      "baseline_out": "",
+      "new": 0,
+      "existing": 0,
+      "suppressed": 0,
+      "expired_suppressions": 0,
+      "severity_overrides": 0,
+      "enrichment": {
+        "snippets": 2,
+        "remediation": 2,
+        "cwe_names": 2
+      },
+      "gate": {
+        "passed": false,
+        "violations": [
+          "2 finding(s) at or above high (limit: none)"
+        ],
+        "counts": {
+          "critical": 0,
+          "high": 2,
+          "medium": 0,
+          "low": 0,
+          "info": 0,
+          "unknown": 0
+        },
+        "considered": 2,
+        "new": 0,
+        "policy": {
+          "fail_on": "high",
+          "fail_on_new": false,
+          "max_total": null,
+          "max_by_severity": {},
+          "deny_packages": [],
+          "deny_cwes": [],
+          "max_cvss": null,
+          "deny_licenses": []
+        }
+      }
+    },
+    "gate": {
+      "passed": false,
+      "violations": [
+        "2 finding(s) at or above high (limit: none)"
+      ],
+      "counts": {
+        "critical": 0,
+        "high": 2,
+        "medium": 0,
+        "low": 0,
+        "info": 0,
+        "unknown": 0
+      },
+      "considered": 2,
+      "new": 0,
+      "policy": {
+        "fail_on": "high",
+        "fail_on_new": false,
+        "max_total": null,
+        "max_by_severity": {},
+        "deny_packages": [],
+        "deny_cwes": [],
+        "max_cvss": null,
+        "deny_licenses": []
+      }
+    }
+  },
+  "findings": [
+    {
+      "id": "f90423d4713457714300d22197dc49c7",
+      "kind": "sast",
+      "engine": "argus-java",
+      "rule_id": "java-sqli-jdbc",
+      "title": "SQL injection: attacker controlled data in a JDBC statement",
+      "severity": "high",
+      "confidence": "medium",
+      "message": "Untrusted data reaches `st.executeQuery(\"SELECT * FROM users WHERE id = \" + id)`. Data originates from request.getParameter.",
+      "cwe": "CWE-89",
+      "location": {
+        "file": "Vulnerable.java",
+        "start_line": 9,
+        "start_column": 9,
+        "end_line": 9,
+        "end_column": 64
+      },
+      "cwe_name": "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+      "cwe_name_ru": "Инъекция SQL",
+      "description": "SQL injection: attacker controlled data in a JDBC statement",
+      "remediation": [
+        "Use a prepared statement with bound parameters instead of string concatenation.",
+        "Используйте параметризованные запросы и prepared statements.",
+        "Применяйте ORM или query builder с плейсхолдерами."
+      ],
+      "snippet": {
+        "start_line": 7,
+        "lines": [
+          "        String id = request.getParameter(\"id\");",
+          "        java.sql.Statement st = null;",
+          "        st.executeQuery(\"SELECT * FROM users WHERE id = \" + id);",
+          "    }",
+          "}"
+        ]
+      },
+      "metadata": {
+        "engine": "argus-java",
+        "line_text": "st.executeQuery(\"SELECT * FROM users WHERE id = \" + id)",
+        "sources": [
+          "request.getParameter"
+        ],
+        "sink": "executeQuery"
+      }
+    },
+    {
+      "id": "5783bdddd6cfd2aa9b525a4bf6704850",
+      "kind": "sast",
+      "engine": "semgrep",
+      "rule_id": "python-command-injection",
+      "title": "A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every",
+      "severity": "high",
+      "confidence": "high",
+      "message": "A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every argument.",
+      "cwe": "CWE-78",
+      "location": {
+        "file": "app.py",
+        "start_line": 6,
+        "start_column": 12,
+        "end_line": 6,
+        "end_column": 44
+      },
+      "cwe_name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+      "cwe_name_ru": "Инъекция команд операционной системы",
+      "remediation": [
+        "Pass an argument list to ProcessBuilder and never invoke a shell.",
+        "Не вызывайте оболочку; передавайте аргументы списком без shell=True.",
+        "Разрешайте только фиксированный набор команд и аргументов."
+      ],
+      "snippet": {
+        "start_line": 4,
+        "lines": [
+          "def run(cmd):",
+          "    \"\"\"Выполняет команду, собранную из недоверенной строки.\"\"\"",
+          "    return subprocess.call(cmd, shell=True)"
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

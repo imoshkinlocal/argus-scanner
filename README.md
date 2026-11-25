@@ -1,5 +1,8 @@
 # argus — SAST + SCA сканер
 
+[![tests](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/ci.yml)
+[![release](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/release.yml/badge.svg)](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/release.yml)
+
 `argus` — консольный сканер безопасности кода и зависимостей с гибридной архитектурой:
 
 * **SAST** — собственный taint-движок для Java (tree-sitter) + наборы Semgrep-правил
@@ -270,6 +273,33 @@ expires = "2027-01-01"
 (или не пройден quality gate), `2` — ошибка сканирования (нет цели, нет Semgrep,
 сетевой сбой, неверная подпись SBOM).
 `--fail-on none` отключает проверку порога.
+
+### Проверка: демо-пример
+
+`examples/vulnerable` — маленький проект с двумя заведомо известными
+уязвимостями (SQL-инъекция в Java, command injection в Python). Один запуск
+показывает, что сканер действительно находит проблемы:
+
+```bash
+./scripts/demo.sh
+```
+
+```
+HIGH               java-sqli-jdbc
+    at: Vulnerable.java:9
+    cwe: CWE-89 (Improper Neutralization of Special Elements used in an SQL Command)
+
+HIGH               python-command-injection
+    at: app.py:6
+    cwe: CWE-78 (Improper Neutralization of Special Elements used in an OS Command)
+
+Summary: critical: 0, high: 2, medium: 0, low: 0, info: 0, total: 2
+```
+
+Скрипт проверяет не только вывод, но и код возврата `1` и наличие обеих
+находок в JSON. Готовые отчёты этого прогона лежат в
+`examples/report.{txt,json,sarif}`. То же самое выполняется в CI на каждый
+push — вместе с тестами на Python 3.10–3.13.
 
 ---
 
@@ -1065,6 +1095,9 @@ precision 4/4 при ожидаемо низком recall вне категор�
 cd argus
 PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
 ```
+
+Те же тесты идут в CI на Python 3.10–3.13, плюс end-to-end demo-скан:
+[workflow tests](../../actions/workflows/ci.yml).
 
 378 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
 Spring MVC-параметры), секреты и IaC, версии и диапазоны OSV, парсеры
