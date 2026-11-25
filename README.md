@@ -3,22 +3,19 @@
 [![tests](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/ci.yml)
 [![release](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/release.yml/badge.svg)](https://github.com/imoshkinlocal/argus-scanner/actions/workflows/release.yml)
 
-`argus` — консольный сканер безопасности кода и зависимостей с гибридной архитектурой:
+`argus` ищет проблемы безопасности в коде и зависимостях:
 
-* **SAST** — собственный taint-движок для Java (tree-sitter) + наборы Semgrep-правил
-  для Python, JavaScript/TypeScript, Go, PHP, C, C++ и Ruby (включая ERB);
-* **SCA** — проверка манифестов зависимостей по базе [OSV](https://osv.dev)
-  (онлайн-API или локальные архивы для offline-режима);
-* **бенчмарки** — harness'ы для честной оценки качества: OWASP Benchmark (Java) и
-  собственный набор SCA-фикстур;
-* **форматы отчётов** — JSON, SARIF 2.1.0, Markdown и text (плюс OpenVEX);
-* **workflow для CI** — конфиг проекта, baseline, подавления, quality gates,
-  сравнение отчётов, инкрементальный кэш SAST, EPSS/KEV и подписываемые SBOM.
+* SAST: taint-движок для Java на tree-sitter и наборы Semgrep-правил для Python,
+  JavaScript/TypeScript, Go, PHP, C, C++ и Ruby (включая ERB);
+* SCA: проверка манифестов зависимостей по базе [OSV](https://osv.dev) через API
+  или локальные архивы для offline-режима;
+* бенчмарки: OWASP Benchmark для Java и собственный набор SCA-фикстур;
+* отчёты в JSON, SARIF 2.1.0, Markdown и text, плюс OpenVEX;
+* работа в CI: конфиг проекта, baseline, подавления, quality gates, сравнение
+  отчётов, инкрементальный кэш SAST, EPSS/KEV и подписываемые SBOM.
 
-Проект намеренно не содержит веб-панелей, Docker-образов и прочей инфраструктуры:
-это CLI-инструмент, который удобно встраивать в пайплайны.
-
----
+Веб-панели, Docker-образов и серверной части в проекте нет: это CLI для
+пайплайнов.
 
 ## Содержание
 
@@ -35,11 +32,9 @@
 11. [Сравнение отчётов](#сравнение-отчётов)
 12. [Методика бенчмарков](#методика-бенчмарков)
 13. [Результаты](#результаты)
-14. [Ограничения (честно)](#ограничения-честно)
+14. [Ограничения](#ограничения)
 15. [Тесты](#тесты)
 16. [Структура репозитория](#структура-репозитория)
-
----
 
 ## Архитектура
 
@@ -81,7 +76,7 @@ Java-движок отслеживает распространение «гря
 (SQL/LDAP/XPath, `Runtime.exec`, `PrintWriter`, `File*`, `XPath`, cookie-атрибуты
 и т.д.), учитывает санитайзеры по CWE (`ESAPI.encoder()`, `Integer.parseInt`,
 allow-list'ы), свёртку констант, тернарные ветвления и простые контейнеры
-(`List`/`Map`). Модель санитайзеров — **по-CWE**: `Value.clean` содержит набор
+(`List`/`Map`). Модель санитайзеров по-CWE: `Value.clean` содержит набор
 закрытых CWE, поэтому очистка для SQL не «лечит» XSS.
 
 Для Spring MVC параметры контроллера с `@RequestParam`, `@PathVariable`,
@@ -96,8 +91,8 @@ SCA:
   `uv.lock`, `Pipfile(.lock)`, `package.json`, `package-lock.json`, `pom.xml`,
   Gradle, `go.mod`, `composer.json/lock`, `Gemfile`, `gems.rb`, `*.gemspec`,
   `Gemfile.lock`, `Cargo.lock`;
-* `argus/sca/graph.py` восстанавливает транзитивный граф **только из
-  lock-файлов**, где уже зафиксировано разрешение версий: рёбра
+* `argus/sca/graph.py` восстанавливает транзитивный граф только из
+  lock-файлов, где уже зафиксировано разрешение версий: рёбра
   «родитель → потомок» дают `Gemfile.lock`, `package-lock.json` (v1/v2/v3),
   `poetry.lock`, `uv.lock`, `composer.lock` и `Cargo.lock`, а BFS считает
   глубину и direct/transitive. Bare-манифесты дают только direct-зависимости:
@@ -129,17 +124,15 @@ remediation, сниппеты) → запись нового baseline → qualit
 фиксирован, поэтому `--fail-on-new`, подавления и гейты видят уже
 нормализованные находки.
 
----
-
 ## Установка
 
 Требуется Python 3.10+.
 
 ### Готовые сборки
 
-Портативный архив — скачал, распаковал, запустил. Внутри собственный
-CPython 3.11 и Semgrep, системный Python, pip, root и сеть не нужны
-(Linux x86_64, glibc 2.35+; Debian 12, Ubuntu 22.04, Astra 1.8 и новее):
+Портативный архив: распакуйте и запустите. Внутри CPython 3.11 и Semgrep,
+поэтому системный Python, pip, root и сеть не нужны. Нужны Linux x86_64 и
+glibc 2.35+ (Debian 12, Ubuntu 22.04, Astra 1.8 и новее):
 
 ```bash
 tar xzf argus-1.1.0-linux-x86_64.tar.gz
@@ -148,8 +141,8 @@ cd argus-1.1.0-linux-x86_64
 ./argus scan /path/to/repo -f text
 ```
 
-Debian/Astra — универсальный пакет (Architecture: all, при установке
-скачивает актуальный Semgrep с PyPI):
+Для Debian и Astra есть универсальный пакет: Architecture: all, Semgrep
+ставится с PyPI при установке.
 
 ```bash
 sudo apt install ./argus-scanner_1.1.0-4_all.deb
@@ -183,8 +176,6 @@ Semgrep не вендорится: обёртка ищет бинарь в `$ARG
 текущего virtualenv, затем в `PATH`. Без Semgrep работают Java-анализ и SCA,
 а для остальных языков команда вернёт ошибку сканирования (код 2).
 
----
-
 ## Быстрый старт
 
 ```bash
@@ -202,7 +193,7 @@ argus db update                 # скачать архивы OSV (~один р�
 argus sca . --offline
 ```
 
-Машиночитаемый и человекочитаемый отчёты можно получить одним запуском:
+Машинный и человекочитаемый отчёты можно получить одним запуском:
 
 ```bash
 # JSON для автоматики + Markdown для человека
@@ -276,9 +267,9 @@ expires = "2027-01-01"
 
 ### Проверка: демо-пример
 
-`examples/vulnerable` — маленький проект с двумя заведомо известными
-уязвимостями (SQL-инъекция в Java, command injection в Python). Один запуск
-показывает, что сканер действительно находит проблемы:
+`examples/vulnerable` — маленький проект с двумя известными уязвимостями:
+SQL-инъекцией в Java и command injection в Python. Один запуск проверяет, что
+сканер находит обе:
 
 ```bash
 ./scripts/demo.sh
@@ -296,12 +287,9 @@ HIGH               python-command-injection
 Summary: critical: 0, high: 2, medium: 0, low: 0, info: 0, total: 2
 ```
 
-Скрипт проверяет не только вывод, но и код возврата `1` и наличие обеих
-находок в JSON. Готовые отчёты этого прогона лежат в
-`examples/report.{txt,json,sarif}`. То же самое выполняется в CI на каждый
-push — вместе с тестами на Python 3.10–3.13.
-
----
+Скрипт проверяет код возврата `1` и наличие обеих находок в JSON. Готовые
+отчёты этого прогона лежат в `examples/report.{txt,json,sarif}`. CI запускает
+тот же сценарий на каждый push, вместе с тестами на Python 3.10–3.13.
 
 ## GUI
 
@@ -356,11 +344,9 @@ argus-gui               # после pip install -e .
 * вкладка «Справка»: как пользоваться, описание опций, форматы отчётов,
   коды возврата и ограничения.
 
-GUI не содержит собственной логики сканирования: он запускает тот же
-`argus scan`, что и CI. Команда целиком видна в журнале, её можно скопировать
-и повторить в терминале.
-
----
+GUI запускает тот же `argus scan`, что и CI, и своей логики сканирования не
+имеет. Команда целиком видна в журнале, её можно скопировать и повторить в
+терминале.
 
 ## Команды CLI
 
@@ -522,13 +508,11 @@ argus cwe 79 -f json           # машинный формат
 «Открыть на cwe.mitre.org». В деталях любой находки CWE расшифровывается
 автоматически.
 
----
-
 ## Конфиг, baseline, подавления и quality gates
 
-Эти четыре механизма превращают разовый скан в воспроизводимый CI-workflow.
-Порядок применения: **severity overrides → baseline → suppressions → enrichment
-→ baseline-out → quality gate**.
+Конфиг, baseline, подавления и гейты дают повторяемый прогон в CI. Порядок
+применения: severity overrides → baseline → suppressions → enrichment →
+baseline-out → quality gate.
 
 ### Конфиг
 
@@ -551,9 +535,9 @@ CLI-флаги всегда приоритетнее значений из ко�
 
 ### Baseline
 
-Baseline — это JSON-снимок текущих находок. Сравнение идёт по **стабильному
-ключу**, а не по fingerprint с номером строки, поэтому сдвиг кода не делает все
-находки «новыми»:
+Baseline — это JSON-снимок текущих находок. Сравнение идёт по стабильному
+ключу, а не по fingerprint с номером строки, поэтому сдвиг кода не делает
+находки новыми:
 
 * SCA: `kind|rule|package|version`;
 * SAST: `kind|rule|file|message`.
@@ -589,7 +573,7 @@ cwe:CWE-79
 package:lodash@*
 ```
 
-Подавленная находка **остаётся в JSON** с `suppressed: true` и блоком
+Подавленная находка остаётся в JSON с `suppressed: true` и блоком
 `suppression`, но не влияет на exit code и скрывается в text/Markdown/SARIF/GUI.
 `--include-suppressed` показывает её снова; в SARIF она получает
 `suppressions[{kind: "external", justification, status: "accepted"}]`.
@@ -610,7 +594,7 @@ package:lodash@*
 
 `deny_licenses` проверяет и SCA-находки, и все пакеты инвентаря — включая те,
 у которых нет CVE. Нарушения попадают в `stats.gate.violations`, печатаются в
-stderr, а exit code становится 1. Секция `[severity]` позволяет переопределить
+stderr, а exit code становится 1. Секция `[severity]` переопределяет
 severity по правилу, CWE или `package:<name>`; исходное значение сохраняется в
 `metadata.severity_original`.
 
@@ -622,8 +606,6 @@ Java-анализ кэшируется в SQLite по содержимому ф�
 `stats.sast_cache`. Кэш включён по умолчанию, отключается `--no-sast-cache`,
 каталог задаётся `--sast-cache-dir`. Записи старше 30 дней удаляются при
 открытии.
-
----
 
 ## Форматы отчётов
 
@@ -712,7 +694,7 @@ Java-анализ кэшируется в SQLite по содержимому ф�
 версии), при повторе остаётся экземпляр с максимальным `confidence`.
 
 Поля `summary` стабильны и рассчитаны на парсинг: `status` принимает
-`findings` / `clean` / `error`, `total` — число **активных** находок,
+`findings` / `clean` / `error`, `total` — число активных находок,
 `all` — включая подавленные, `suppressed` / `new` / `existing` — счётчики
 workflow, `by_severity` считается только по активным, `by_engine` и
 `by_ecosystem` — счётчики по движкам и экосистемам, `packages` — число
@@ -734,7 +716,7 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
 * таблица сработавших правил;
 * отдельные таблицы SAST-находок (правило, CWE, файл:строка, движок) и
   SCA-находок (advisory, CWE, EPSS, KEV, пакет, установленная/исправленная
-  версия, манифест) с пометкой **new** относительно baseline;
+  версия, манифест) с пометкой `new` относительно baseline;
 * секцию `Remediation` (команды обновления по экосистеме и советы),
   `SAST context` со сниппетами и маркером строки, `Suppressed` (при
   `--include-suppressed`);
@@ -753,15 +735,13 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
   "accepted", justification}]`;
 * нефатальные ошибки попадают в `invocations[0].toolExecutionNotifications`.
 
----
-
 ## Threat intelligence: EPSS и KEV
 
 `--threat-intel` обогащает SCA-находки двумя публичными фидами:
 
-* **EPSS** — вероятность эксплуатации CVE в ближайшие 30 дней и перцентиль
+* EPSS: вероятность эксплуатации CVE в ближайшие 30 дней и перцентиль
   (`https://api.first.org/data/v1/epss`);
-* **CISA KEV** — каталог уязвимостей, которые уже эксплуатируются, с датой
+* CISA KEV: каталог уязвимостей, которые уже эксплуатируются, с датой
   добавления, дедлайном устранения и признаком ransomware
   (`known_exploited_vulnerabilities.json`).
 
@@ -800,21 +780,19 @@ argus sca . --threat-intel --threat-ttl 1        # обновлять раз в 
 совпадений записываются в `stats.threat_intel` (`epss_matches`,
 `kev_matches`, `kev_ransomware`, `sources`, `fetched_at`).
 
-В Markdown у SCA-таблицы появляются колонки **EPSS** (`0.974 (100%)`) и
-**KEV** (`yes` / `yes (ransomware)`), в SARIF — поля
+В Markdown у SCA-таблицы появляются колонки EPSS (`0.974 (100%)`) и KEV
+(`yes` / `yes (ransomware)`), в SARIF — поля
 `properties.epss`, `epss_percentile`, `kev`, `kev_ransomware`,
 `kev_due_date`. Severity автоматически не меняется: фиды дают контекст, а
 порог и гейты остаются явными.
 
----
-
 ## SBOM (CycloneDX / SPDX)
 
 SBOM (Software Bill of Materials) — машиночитаемый перечень компонентов
-проекта. `argus sbom` строится из **того же инвентаря**, что использует SCA
+проекта. `argus sbom` строится из того же инвентаря, что использует SCA
 (`collect_inventory` в `argus/sca/scanner.py`), поэтому список пакетов в SBOM и
 в отчёте об уязвимостях не расходится. OSV при этом не вызывается: команда
-работает офлайн и просто экспортирует объявленные зависимости.
+работает офлайн и экспортирует объявленные зависимости.
 
 ### CycloneDX 1.5
 
@@ -908,7 +886,7 @@ SBOM (Software Bill of Materials) — машиночитаемый перече�
   top-level `dependencies` (`ref` → `dependsOn`) и свойства `argus:direct` /
   `argus:depth`, SPDX — отношения `DEPENDS_ON`. Если lock-файла с рёбрами нет,
   `dependsOn` пуст, а прямой статус берётся из манифеста.
-* Хэши и лицензии берутся **только из lock-файлов**: npm `integrity`
+* Хэши и лицензии берутся только из lock-файлов: npm `integrity`
   (SRI → hex), Composer `license` + `dist.shasum`, Poetry/uv `hash`,
   Cargo `checksum`, `license` в `package-lock.json`. Если источник их не
   содержит, поле остаётся пустым / `NOASSERTION`, а не заполняется догадками.
@@ -918,9 +896,7 @@ SBOM (Software Bill of Materials) — машиночитаемый перече�
   `argus sbom --verify FILE [--sign-key KEY]`; неверная подпись даёт код 2.
 * `-f md` (или `--summary`) печатает тот же инвентарь таблицей с колонками
   License/Hashes, Direct/Depth, секцией `Dependency tree` и пометкой источника
-  версии (`pinned` / `range lower bound`) — удобно приложить к релизу.
-
----
+  версии (`pinned` / `range lower bound`). Такой отчёт можно приложить к релизу.
 
 ## VEX
 
@@ -940,8 +916,6 @@ argus vex report.json --author "SecOps"
 Документ содержит `@context`, `@id`, `timestamp`, `version`,
 `tooling` и `statements[]` с `vulnerability.name/aliases`, `products[].identifiers.purl`
 и статусом. SAST-находки в VEX не попадают.
-
----
 
 ## Сравнение отчётов
 
@@ -964,8 +938,6 @@ argus diff old.json new.json --fail-on none   # только отчёт
 `--include-suppressed` возвращает их. Формат `json` содержит `counts`,
 `new_findings`, `fixed_findings`, `changed_findings`.
 
----
-
 ## Методика бенчмарков
 
 ### OWASP Benchmark (SAST)
@@ -979,10 +951,10 @@ TPR = TP / (TP + FN)        FPR = FP / (FP + TN)
 Score = TPR − FPR           (Youden index, как в OWASP-скоркартах)
 ```
 
-Дополнительно считаются precision, F1, разбивка **по категориям** (CWE) и
-**по сработавшим правилам** (сколько находок пришлось на уязвимые и на чистые
-кейсы). Harness умеет оценивать как встроенные движки (`--engine java|semgrep`),
-так и произвольный внешний SARIF (`--sarif`), поэтому один и тот же отчёт можно
+Дополнительно считаются precision, F1, разбивка по категориям (CWE) и по
+сработавшим правилам (сколько находок пришлось на уязвимые и на чистые кейсы).
+Harness умеет оценивать как встроенные движки (`--engine java|semgrep`), так и
+произвольный внешний SARIF (`--sarif`), поэтому один и тот же отчёт можно
 сравнивать с другими инструментами.
 
 Кэш находок (`--cache`) инвалидируется по fingerprint исходников движка и
@@ -1001,9 +973,9 @@ Score = TPR − FPR           (Youden index, как в OWASP-скоркарта�
 }
 ```
 
-Скоринг dependency-level: **TP** — ожидаемый пакет найден хотя бы с одним из
-перечисленных CVE/GHSA (учитываются aliases); **FN** — не найден; **FP** —
-найден пакет, который фикстура считает чистым (или не упоминает). Формула та же:
+Скоринг dependency-level: TP — ожидаемый пакет найден хотя бы с одним из
+перечисленных CVE/GHSA (учитываются aliases); FN — не найден; FP — найден
+пакет, который фикстура считает чистым (или не упоминает). Формула та же:
 `score = recall − FPR`.
 
 Фикстуры покрывают Maven (log4shell), npm (lodash), PyPI (flask, PyYAML),
@@ -1011,15 +983,13 @@ Go (jwt-go), Packagist (PHPMailer), RubyGems (`rack` с `Gemfile.lock` и
 `rack` с `Gemfile`, включая диапазоны и dev-группу), Cargo (time) и два
 «чистых» проекта (Python и npm), чтобы ловить ложные срабатывания.
 
----
-
 ## Результаты
 
 | Бенчмарк | Движок | TP | FP | FN | TPR | FPR | Score |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| OWASP Benchmark (2740 кейсов) | `argus-java` | 1415 | 0 | 0 | 100.0% | 0.0% | **100.0** |
-| OWASP Benchmark (2740 кейсов) | Semgrep (встроенный Java-пак) | 893 | 712 | 522 | 63.1% | 53.7% | **9.4** |
-| SCA-фикстуры (11 фикстур, 10 пакетов) | `osv` | 10 | 0 | 0 | 100.0% | 0.0% | **100.0** |
+| OWASP Benchmark (2740 кейсов) | `argus-java` | 1415 | 0 | 0 | 100.0% | 0.0% | 100.0 |
+| OWASP Benchmark (2740 кейсов) | Semgrep (встроенный Java-пак) | 893 | 712 | 522 | 63.1% | 53.7% | 9.4 |
+| SCA-фикстуры (11 фикстур, 10 пакетов) | `osv` | 10 | 0 | 0 | 100.0% | 0.0% | 100.0 |
 
 Полные отчёты (JSON + Markdown, включая разбивку по CWE и по правилам):
 `benchmark_results/`.
@@ -1029,19 +999,17 @@ Go (jwt-go), Packagist (PHPMailer), RubyGems (`rack` с `Gemfile.lock` и
 находки, все 4 подтверждены вручную (command injection ×2, open redirect ×2);
 precision 4/4 при ожидаемо низком recall вне категорий OWASP Benchmark.
 
----
+## Ограничения
 
-## Ограничения (честно)
-
-* **100.0 на OWASP Benchmark — это не «100% в бою».** Java-движок разрабатывался
+* 100.0 на OWASP Benchmark не значит «100% в бою». Java-движок разрабатывался
   и калибровался на идиомах бенчмарка (сервлетные `getParameter`, ESAPI,
   фабрики `Test`-классов). На незнакомом коде recall заметно ниже — см. проверку
   на `java-sec-code` выше.
-* Анализ **внутрифайловый и внутриметодный**: нет межфайлового dataflow, нет
+* Анализ внутрифайловый и внутриметодный: нет межфайлового dataflow, нет
   разбора фреймворковых конфигураций. Spring MVC покрыт только на уровне
   аннотированных параметров контроллера (`@RequestParam`, `@RequestBody`, …);
   данные, пришедшие из БД/очередей/других сервисов, источниками не считаются.
-  Meжпроцедурные цепочки через поля класса поддерживаются лишь частично.
+  Межпроцедурные цепочки через поля класса поддерживаются лишь частично.
 * Санитайзеры описаны вручную в каталоге (`argus/sast/java/catalog.py`);
   кастомные wrapper'ы очистки не распознаются и могут давать ложные
   срабатывания (или, наоборот, пропуски).
@@ -1075,9 +1043,8 @@ precision 4/4 при ожидаемо низком recall вне категор�
 * Скоринг OWASP — файловый: срабатывание любого правила в файле засчитывается
   категории этого файла, поэтому «чужие» правила могут слегка искажать
   per-category метрики (общий score при этом корректен).
-* SBOM — **manifest/lock-level**: компоненты и рёбра берутся из манифестов и
-  lock-файлов; хэши и лицензии извлекаются только там, где lock-файл их
-  содержит (npm `integrity`, Composer `shasum`, Poetry/uv `hash`, Cargo
+* SBOM строится по манифестам и lock-файлам: хэши и лицензии извлекаются
+  только там, где lock-файл их содержит (npm `integrity`, Composer `shasum`, Poetry/uv `hash`, Cargo
   `checksum`, `license`). Для остальных компонентов поля пустые /
   `NOASSERTION`. Транзитивные пакеты появляются только там, где lock-файл их
   перечисляет; для точных версий нужен lock-файл, иначе диапазон разрешается в
@@ -1086,8 +1053,6 @@ precision 4/4 при ожидаемо низком recall вне категор�
   При отсутствии сети используется кэш (возможно, устаревший), а причина
   попадает в `stats.threat_intel.errors`. Локальные `--epss-file`/`--kev-file`
   полностью воспроизводимы, но их нужно обновлять самостоятельно.
-
----
 
 ## Тесты
 
@@ -1099,7 +1064,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
 Те же тесты идут в CI на Python 3.10–3.13, плюс end-to-end demo-скан:
 [workflow tests](../../actions/workflows/ci.yml).
 
-378 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
+379 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
 Spring MVC-параметры), секреты и IaC, версии и диапазоны OSV, парсеры
 манифестов (включая `Gemfile`/`*.gemspec` и извлечение лицензий/хэшей),
 дедупликация пакетов SCA, рёбра lock-файлов и BFS-глубины графа, фильтрация
@@ -1118,8 +1083,6 @@ SAST-кэш, целостность offline-базы OSV (`--verify`), EPSS/KEV 
 идентификаторов, поиск, покрытие правил, CLI-форматы), структура и валидность
 Semgrep-паков (включая прогон правил по уязвимым сэмплам и проверку
 подавления C-шума).
-
----
 
 ## Структура репозитория
 
