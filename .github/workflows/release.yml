@@ -86,7 +86,12 @@ jobs:
             fi
           done
 
-          tar czf "staging/argus-$VERSION-linux-x86_64.tar.gz" -C staging \
+          # A fixed mtime keeps the tarball reproducible and avoids entries
+          # dated in the future (pip records are stamped in the wheel's
+          # local time zone, which can be ahead of the runner's clock).
+          MTIME="$(TZ=UTC git log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd)"
+          tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="$MTIME" \
+            -czf "staging/argus-$VERSION-linux-x86_64.tar.gz" -C staging \
             "argus-$VERSION-linux-x86_64"
 
       - name: Smoke test the archive
