@@ -1,0 +1,6 @@
+{
+  "description": "time 0.1.42 has a soundness bug that can cause memory corruption (RUSTSEC-2020-0071).",
+  "findings": [
+    {"package": "time", "version": "0.1.42", "vulns": ["RUSTSEC-2020-0071", "CVE-2020-26235"]}
+  ]
+}

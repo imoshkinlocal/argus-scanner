@@ -1,0 +1,89 @@
+rules:
+  - id: cpp-command-injection
+    languages: [cpp]
+    severity: ERROR
+    message: >-
+      A shell command is executed with dynamic data. Use `execv` with an argument
+      vector and validate every element.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: std::system($CMD)
+          - pattern: '::system($CMD)'
+          - pattern: popen($CMD, $MODE)
+      - pattern-not: std::system("...")
+      - pattern-not: popen("...", $MODE)
+
+  - id: cpp-unsafe-string-copy
+    languages: [cpp]
+    severity: ERROR
+    message: >-
+      Unbounded C string copies overflow the destination buffer. Use
+      `std::string` or `snprintf`.
+    metadata:
+      cwe: "CWE-120: Buffer Copy without Checking Size of Input"
+      confidence: HIGH
+    pattern-either:
+      - pattern: std::strcpy($DST, $SRC)
+      - pattern: std::strcat($DST, $SRC)
+      - pattern: std::sprintf($DST, ...)
+      - pattern: strcpy($DST, $SRC)
+      - pattern: strcat($DST, $SRC)
+
+  - id: cpp-unsafe-format
+    languages: [cpp]
+    severity: ERROR
+    message: >-
+      A non-literal format string allows memory disclosure and writes.
+    metadata:
+      cwe: "CWE-134: Use of Externally-Controlled Format String"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: std::printf($FMT, ...)
+          - pattern: std::fprintf($FP, $FMT, ...)
+          - pattern: '::printf($FMT, ...)'
+      - pattern-not: std::printf("...", ...)
+      - pattern-not: std::fprintf($FP, "...", ...)
+
+  - id: cpp-dynamic-library-load
+    languages: [cpp]
+    severity: WARNING
+    message: >-
+      Loading a shared library from a dynamic path can execute arbitrary code.
+      Restrict the path to a fixed, trusted directory.
+    metadata:
+      cwe: "CWE-114: Process Control"
+      confidence: MEDIUM
+    patterns:
+      - pattern: dlopen($PATH, ...)
+      - pattern-not: dlopen("...", ...)
+
+  - id: cpp-weak-crypto
+    languages: [cpp]
+    severity: ERROR
+    message: >-
+      DES/RC4/MD5 primitives are obsolete. Use AES-GCM and SHA-256+.
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      confidence: HIGH
+    pattern-either:
+      - pattern: EVP_des_ecb()
+      - pattern: EVP_rc4()
+      - pattern: MD5(...)
+      - pattern: SHA1(...)
+
+  - id: cpp-insecure-random
+    languages: [cpp]
+    severity: WARNING
+    message: >-
+      `std::rand` is predictable. Use `std::random_device` seeded once, or an
+      OS CSPRNG for security-sensitive values.
+    metadata:
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: std::rand()
+      - pattern: std::srand($SEED)

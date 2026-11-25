@@ -1,0 +1,5 @@
+{
+  "description": "Small utility libraries pinned to versions with no OSV advisories.",
+  "findings": [],
+  "clean": ["six", "click", "packaging"]
+}

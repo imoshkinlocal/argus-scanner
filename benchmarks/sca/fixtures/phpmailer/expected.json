@@ -1,0 +1,6 @@
+{
+  "description": "PHPMailer 5.2.17 is vulnerable to remote code execution (CVE-2016-10033).",
+  "findings": [
+    {"package": "phpmailer/phpmailer", "version": "5.2.17", "vulns": ["CVE-2016-10033", "CVE-2016-10045"]}
+  ]
+}

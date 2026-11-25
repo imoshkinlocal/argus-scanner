@@ -1,0 +1,6 @@
+{
+  "description": "PyYAML 5.1 allows arbitrary code execution through yaml.load.",
+  "findings": [
+    {"package": "pyyaml", "version": "5.1", "vulns": ["CVE-2020-1747", "CVE-2020-14343"]}
+  ]
+}

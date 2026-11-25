@@ -1,0 +1,98 @@
+argus-scanner for Debian
+========================
+
+Architecture-independent package
+--------------------------------
+The binary package is "Architecture: all".  It contains only the pure-Python
+wheel of argus, the launchers and the man pages: no compiled objects and no
+third-party binaries.  The same .deb therefore works on every architecture
+that Python supports, and Debian Policy 4.13 is satisfied.
+
+Private Python runtime
+----------------------
+During configuration the package creates
+
+  /var/lib/argus-scanner/runtime
+
+a virtual environment with argus and its dependencies (tree-sitter,
+tree-sitter-java, Semgrep and its closure) downloaded from the Python package
+index.  This is why python3-tree-sitter, python3-tree-sitter-java and Semgrep
+do not have to exist in the archive, and why nothing has to be vendored.
+
+Consequences:
+
+  * installation needs network access, or a wheel directory (see below);
+  * about 380 MB are used under /var/lib;
+  * Python 3.10 or newer is required, because current Semgrep releases do not
+    support older interpreters.
+
+If the download is impossible the installation still succeeds.  The
+launchers then print what to do, and the runtime can be provisioned later.
+
+Provisioning, updating and removing the runtime
+-----------------------------------------------
+  sudo argus-setup-runtime                  # install or rebuild, latest deps
+  sudo argus-setup-runtime --list           # versions and size
+  sudo argus-setup-runtime --upgrade-semgrep
+                                            # update only Semgrep
+  sudo argus-setup-runtime --semgrep 1.90.0 # pin Semgrep
+  sudo argus-setup-runtime --remove         # delete the runtime
+  sudo argus-setup-runtime --wheelhouse DIR # install offline from wheels
+
+A freshly installed Semgrep is verified by running it; if it does not start,
+the previous version is reinstalled automatically.
+
+Offline installation
+--------------------
+On a machine with network access, prepare wheels for the target platform
+(the same Python version and architecture as the target):
+
+  pip download argus-scanner semgrep -d wheels
+
+Then either pass the directory to the package manager:
+
+  sudo ARGUS_WHEELHOUSE=/media/wheels apt install ./argus-scanner_1.1.0-3_amd64.deb
+
+or write the directory into the first line of /etc/argus-scanner/wheelhouse
+and install normally.  The runtime can also be rebuilt afterwards:
+
+  sudo argus-setup-runtime --wheelhouse /media/wheels
+
+Set ARGUS_SKIP_RUNTIME_SETUP=1 to skip the download entirely.
+
+Semgrep selection
+-----------------
+argus uses the Semgrep from its own runtime.  Set ARGUS_SEMGREP to force a
+different binary:
+
+  ARGUS_SEMGREP=/usr/local/bin/semgrep argus scan ...
+
+pip honours the usual configuration (/etc/pip.conf, ~/.config/pip/pip.conf,
+PIP_INDEX_URL), so an internal mirror can be used.
+
+PEP 668
+-------
+Do not install Semgrep with the system interpreter:
+
+  pip install semgrep          # fails: externally-managed-environment
+
+Debian and Astra mark the system Python as externally managed.  The runtime
+is a virtual environment, where pip skips that check, so
+argus-setup-runtime is not affected.
+
+GUI
+---
+The Tk front-end is in the same binary package.  It needs python3-tk
+(Recommends) and a graphical session; the CLI works without either.
+
+Offline dependency scanning
+---------------------------
+SCA uses api.osv.dev by default.  For offline use:
+
+  argus db update
+  argus sca . --offline
+
+The database is stored in ~/.cache/argus/osv-db and can be copied between
+machines.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>

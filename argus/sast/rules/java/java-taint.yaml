@@ -1,0 +1,204 @@
+rules:
+  - id: java-taint-sqli-jdbc
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data reaches a JDBC query. Use a PreparedStatement
+      with bound parameters instead of string concatenation.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+      references:
+        - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getParameterValues(...)
+      - pattern: $REQ.getParameterMap(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getHeaders(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $REQ.getPathInfo(...)
+      - pattern: $REQ.getCookies(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sanitizers:
+      - pattern: Integer.parseInt(...)
+      - pattern: Long.parseLong(...)
+      - pattern: Double.parseDouble(...)
+      - pattern: $ESAPI.encodeForSQL(...)
+    pattern-sinks:
+      - pattern: $STMT.executeQuery(...)
+      - pattern: $STMT.execute(...)
+      - pattern: $STMT.executeUpdate(...)
+      - pattern: $STMT.addBatch(...)
+      - pattern: $CONN.prepareStatement(...)
+      - pattern: $EM.createQuery(...)
+      - pattern: $EM.createNativeQuery(...)
+
+  - id: java-taint-cmdi
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data reaches an OS command. Pass a fixed command and
+      validate arguments, or avoid the shell entirely.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getParameterValues(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $REQ.getPathInfo(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sanitizers:
+      - pattern: Integer.parseInt(...)
+      - pattern: Long.parseLong(...)
+    pattern-sinks:
+      - pattern: Runtime.getRuntime().exec(...)
+      - pattern: $PB.command(...)
+      - pattern: new ProcessBuilder(...)
+
+  - id: java-taint-xss-writer
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data is written to the HTTP response without output
+      encoding. Encode with the ESAPI encoders or a templating engine.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: HIGH
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getParameterValues(...)
+      - pattern: $REQ.getParameterMap(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getHeaders(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $REQ.getPathInfo(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sanitizers:
+      - pattern: $ESAPI.encodeForHTML(...)
+      - pattern: $ESAPI.encodeForHTMLAttribute(...)
+      - pattern: $ESAPI.encodeForJavaScript(...)
+      - pattern: $ESAPI.encodeForCSS(...)
+      - pattern: $ESAPI.encodeForURL(...)
+      - pattern: $ESAPI.encodeForBase64(...)
+      - pattern: org.apache.commons.text.StringEscapeUtils.escapeHtml4(...)
+      - pattern: org.springframework.web.util.HtmlUtils.htmlEscape(...)
+    pattern-sinks:
+      - pattern: $RESP.getWriter().print(...)
+      - pattern: $RESP.getWriter().println(...)
+      - pattern: $RESP.getWriter().printf(...)
+      - pattern: $RESP.getWriter().format(...)
+      - pattern: $RESP.getWriter().write(...)
+      - pattern: $RESP.getOutputStream().write(...)
+
+  - id: java-taint-pathtraver
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data is used to build a file system path. Resolve the
+      path and verify it stays inside the intended directory.
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: HIGH
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getParameterValues(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $REQ.getPathInfo(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sanitizers:
+      - pattern: Integer.parseInt(...)
+      - pattern: Long.parseLong(...)
+    pattern-sinks:
+      - pattern: new java.io.File(...)
+      - pattern: new java.io.FileInputStream(...)
+      - pattern: new java.io.FileOutputStream(...)
+      - pattern: new java.io.FileReader(...)
+      - pattern: new java.io.FileWriter(...)
+      - pattern: java.nio.file.Paths.get(...)
+      - pattern: java.nio.file.Files.newInputStream(...)
+
+  - id: java-taint-ldapi
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data reaches an LDAP query. Escape the value with the
+      ESAPI LDAP encoder or a dedicated filter builder.
+    metadata:
+      cwe: "CWE-90: Improper Neutralization of Special Elements used in an LDAP Query"
+      confidence: HIGH
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sanitizers:
+      - pattern: $ESAPI.encodeForLDAP(...)
+    pattern-sinks:
+      - pattern: $CTX.search(...)
+      - pattern: $DIR.search(...)
+      - pattern: $CTX.lookup(...)
+
+  - id: java-taint-xpathi
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data reaches an XPath expression. Compile the
+      expression with variables instead of concatenating untrusted input.
+    metadata:
+      cwe: "CWE-643: Improper Neutralization of Data within XPath Expressions"
+      confidence: HIGH
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sinks:
+      - pattern: $XPATH.evaluate(...)
+      - pattern: $XPATH.compile(...)
+
+  - id: java-taint-trustbound
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data is stored at a higher trust boundary (session or
+      application scope). Validate it before persisting.
+    metadata:
+      cwe: "CWE-501: Trust Boundary Violation"
+      confidence: MEDIUM
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+      - pattern: $COOKIE.getValue(...)
+    pattern-sinks:
+      - pattern: $SESSION.setAttribute(...)
+      - pattern: $SESSION.putValue(...)
+
+  - id: java-taint-ssrf
+    mode: taint
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Attacker controlled data is used as a URL target. Validate against an
+      allow-list of hosts before making the request.
+    metadata:
+      cwe: "CWE-918: Server-Side Request Forgery"
+      confidence: MEDIUM
+    pattern-sources:
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getHeader(...)
+      - pattern: $REQ.getQueryString(...)
+    pattern-sinks:
+      - pattern: new java.net.URL(...)
+      - pattern: $CLIENT.execute(...)

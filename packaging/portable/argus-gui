@@ -1,0 +1,25 @@
+#!/bin/sh
+# GUI launcher (needs the system X libraries and a graphical session).
+set -e
+SELF=$0
+while [ -L "$SELF" ]; do
+    LINK=$(readlink "$SELF")
+    case $LINK in
+        /*) SELF=$LINK ;;
+        *) SELF=$(dirname "$SELF")/$LINK ;;
+    esac
+done
+ROOT=$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)
+PY="$ROOT/python/bin/python3.11"
+
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="$ROOT/semgrep-overlay:$ROOT/runtime"
+export PATH="$ROOT/python/bin:$ROOT/runtime/bin:$PATH"
+
+CERT="$ROOT/runtime/certifi/cacert.pem"
+if [ -r "$CERT" ] && [ -z "${SSL_CERT_FILE:-}" ]; then
+    SSL_CERT_FILE="$CERT"
+    export SSL_CERT_FILE
+fi
+
+exec "$PY" -m argus.gui "$@"

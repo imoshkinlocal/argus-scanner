@@ -1,0 +1,5 @@
+{
+  "description": "Utility packages pinned to versions with no OSV advisories.",
+  "findings": [],
+  "clean": ["is-number", "left-pad"]
+}

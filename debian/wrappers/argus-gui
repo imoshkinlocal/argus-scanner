@@ -1,0 +1,17 @@
+#!/bin/sh
+# Debian launcher for the Tk front-end.
+set -e
+VENV=/var/lib/argus-scanner/runtime
+
+if [ ! -x "$VENV/bin/argus-gui" ]; then
+    echo "argus-gui: the Python runtime is not installed." >&2
+    echo "argus-gui: run 'sudo argus-setup-runtime' (needs network or --wheelhouse DIR)." >&2
+    exit 2
+fi
+
+PYTHONNOUSERSITE=1
+export PYTHONNOUSERSITE
+PATH="$VENV/bin:$PATH"
+export PATH
+
+exec "$VENV/bin/argus-gui" "$@"

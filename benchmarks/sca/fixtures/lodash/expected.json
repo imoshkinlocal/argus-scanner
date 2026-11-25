@@ -1,0 +1,10 @@
+{
+  "description": "lodash 4.17.15 is affected by prototype pollution issues.",
+  "findings": [
+    {
+      "package": "lodash",
+      "version": "4.17.15",
+      "vulns": ["CVE-2020-8203", "CVE-2021-23337", "CVE-2019-10744"]
+    }
+  ]
+}

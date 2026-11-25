@@ -1,0 +1,116 @@
+rules:
+  - id: go-command-injection
+    languages: [go]
+    severity: ERROR
+    message: >-
+      A shell is invoked with a dynamic command line. Pass the program and its
+      arguments separately and validate them.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command("sh", "-c", $CMD)
+          - pattern: exec.Command("bash", "-c", $CMD)
+          - pattern: exec.Command("cmd", "/C", $CMD)
+          - pattern: exec.CommandContext($CTX, "sh", "-c", $CMD)
+      - pattern-not: exec.Command("sh", "-c", "...")
+
+  - id: go-sql-injection
+    languages: [go]
+    severity: ERROR
+    message: >-
+      SQL is assembled with `fmt.Sprintf` or concatenation. Use placeholders
+      (`?`, `$1`) and pass arguments separately.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+    pattern-either:
+      - pattern: $DB.Query(fmt.Sprintf(...), ...)
+      - pattern: $DB.QueryRow(fmt.Sprintf(...), ...)
+      - pattern: $DB.Exec(fmt.Sprintf(...), ...)
+      - pattern: $DB.Query("..." + $X, ...)
+      - pattern: $DB.Exec("..." + $X, ...)
+
+  - id: go-tls-insecure-skip-verify
+    languages: [go]
+    severity: ERROR
+    message: >-
+      `InsecureSkipVerify: true` disables certificate validation and enables
+      man-in-the-middle attacks.
+    metadata:
+      cwe: "CWE-295: Improper Certificate Validation"
+      confidence: HIGH
+    pattern: 'tls.Config{..., InsecureSkipVerify: true, ...}'
+
+  - id: go-weak-hash
+    languages: [go]
+    severity: WARNING
+    message: >-
+      crypto/md5 and crypto/sha1 are broken for security purposes. Use
+      crypto/sha256 or stronger.
+    metadata:
+      cwe: "CWE-328: Use of Weak Hash"
+      confidence: HIGH
+    pattern-either:
+      - pattern: md5.New()
+      - pattern: md5.Sum(...)
+      - pattern: sha1.New()
+      - pattern: sha1.Sum(...)
+
+  - id: go-weak-cipher
+    languages: [go]
+    severity: ERROR
+    message: >-
+      DES, 3DES and RC4 are obsolete ciphers. Use AES-GCM.
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      confidence: HIGH
+    pattern-either:
+      - pattern: des.NewCipher(...)
+      - pattern: des.NewTripleDESCipher(...)
+      - pattern: rc4.NewCipher(...)
+
+  - id: go-insecure-random
+    languages: [go]
+    severity: WARNING
+    message: >-
+      math/rand is predictable. Use crypto/rand for tokens, keys and salts.
+    metadata:
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: rand.Intn(...)
+      - pattern: rand.Int(...)
+      - pattern: rand.Read(...)
+
+  - id: go-path-traversal
+    languages: [go]
+    severity: WARNING
+    message: >-
+      The file served by this handler may be attacker controlled. Clean the path
+      and verify it stays inside the intended directory.
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: LOW
+    pattern-either:
+      - pattern: http.ServeFile($W, $R, $R.URL.Path)
+      - pattern: http.ServeFile($W, $R, $R.FormValue(...))
+
+  - id: go-hardcoded-secret
+    languages: [go]
+    severity: WARNING
+    message: >-
+      A credential appears to be hardcoded. Load it from the environment or a
+      secret manager.
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: MEDIUM
+    patterns:
+      - pattern: $VAR := "..."
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i)^(?:.*(?:password|passwd|secret|apikey|api_?key|token).*)$
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ^(?!.*(?:placeholder|example|changeme|dummy)).*$

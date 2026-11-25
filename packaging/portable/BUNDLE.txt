@@ -1,0 +1,54 @@
+argus 1.1.0 — portable Linux bundle
+==================================
+
+Everything needed to run argus is inside this directory. Nothing is installed
+into the system and nothing is downloaded on the first run.
+
+Versions
+--------
+  argus            1.1.0
+  Python           3.11.18 (python-build-standalone 20261124, x86_64)
+  Semgrep          1.187.0
+  tree-sitter      0.26.1
+  tree-sitter-java 0.23.5
+
+Platform
+--------
+  Linux x86_64, glibc >= 2.35 (Debian 12, Ubuntu 22.04, Astra 1.8 and newer).
+
+Layout
+------
+  argus                  CLI launcher
+  argus-gui              GUI launcher (needs system X libraries)
+  python/                private CPython interpreter
+  runtime/               installed Python packages, including Semgrep
+  update-semgrep.sh      Semgrep updater (installs into semgrep-overlay/)
+  README.md              quick start
+  README-argus.md        full argus documentation
+  THIRD-PARTY-NOTICES.md licenses of the bundled components
+  licenses/              license texts (Semgrep LGPL-2.1)
+  LICENSE                MIT license for argus
+
+How it works
+------------
+  ./argus sets PYTHONPATH to ./runtime and runs
+  ./python/bin/python3.11 -m argus.cli.  The interpreter is relocatable, so
+  the directory can be moved or renamed freely.  Semgrep runs from
+  ./runtime/bin/semgrep and keeps its native core in
+  ./runtime/semgrep/bin/semgrep-core.
+
+  The bundle does not use the system Python, pip, site-packages, or any
+  virtualenv.  PYTHONNOUSERSITE=1 prevents ~/.local from leaking in.
+
+Semgrep updates
+---------------
+  ./update-semgrep.sh            installs the latest release into
+                                 ./semgrep-overlay; ./argus prefers it over
+                                 the bundled copy.
+  ./update-semgrep.sh --remove   deletes the overlay and falls back to the
+                                 bundled Semgrep.
+
+Source of the archive
+---------------------
+  Built from argus 1.1.0 (py3-none-any wheel) and the pinned wheels listed
+  above.  Reproducible with the release workflow in the project repository.

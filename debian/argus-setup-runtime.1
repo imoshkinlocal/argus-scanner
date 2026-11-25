@@ -1,0 +1,83 @@
+.TH ARGUS-SETUP-RUNTIME 1 "2026-11-25" "argus 1.1.0" "User Commands"
+.SH NAME
+argus-setup-runtime \- provision or update the Python runtime used by argus
+.SH SYNOPSIS
+.B argus-setup-runtime
+.RI [ options ]
+.SH DESCRIPTION
+.B argus-setup-runtime
+creates the private Python environment in
+.I /var/lib/argus-scanner/runtime
+from the argus wheel shipped in the
+.B argus-scanner
+package and the current releases of its dependencies.
+.PP
+Because the package contains no compiled objects, the environment matches the
+local Python version and architecture, and Semgrep is updated whenever the
+runtime is rebuilt.  The
+.B postinst
+script runs this command once during installation; it never fails the
+installation if the download is impossible.
+.PP
+Installations without network access can build the runtime from a directory
+of wheels created on another machine:
+.IP
+.nf
+pip download argus-scanner semgrep -d wheels
+argus-setup-runtime --wheelhouse wheels
+.fi
+.SH OPTIONS
+.TP
+.BR \-\-wheelhouse " " \fIDIR\fR
+Install offline from a directory of wheels.
+.TP
+.BR \-\-semgrep " " \fIVERSION\fR
+Pin Semgrep to an exact version instead of the latest release.
+.TP
+.B \-\-upgrade-semgrep
+Update only Semgrep inside an existing runtime.  The new version is verified;
+if it does not run, the previous one is reinstalled.
+.TP
+.B \-\-list
+Print the runtime location, Python, argus and Semgrep versions and size.
+.TP
+.B \-\-remove
+Delete the runtime.
+.TP
+.BR \-h ", " \-\-help
+Show a short usage summary.
+.SH ENVIRONMENT
+.TP
+.B ARGUS_WHEELHOUSE
+Wheel directory used by
+.B postinst
+when the package is installed.
+.TP
+.B ARGUS_SKIP_RUNTIME_SETUP
+Set to 1 to install the package without contacting the package index.
+.SH FILES
+.TP
+.I /var/lib/argus-scanner/runtime
+The private virtual environment.
+.TP
+.I /usr/lib/argus-scanner/argus_scanner-*.whl
+The argus wheel shipped in this package.
+.TP
+.I /etc/argus-scanner/wheelhouse
+Optional file whose first line names a wheel directory for offline installs.
+.SH EXIT STATUS
+.TP
+.B 0
+The requested action succeeded, or the runtime is already absent for
+.BR \-\-list .
+.TP
+.B 1
+The runtime could not be created or the new Semgrep does not run.
+.TP
+.B 2
+Usage error or missing privileges.
+.SH SEE ALSO
+.BR argus (1),
+.I /usr/share/doc/argus-scanner/README.Debian
+.SH AUTHOR
+argus contributors.

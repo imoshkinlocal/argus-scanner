@@ -1,0 +1,46 @@
+Building argus-scanner
+======================
+
+The source package contains the argus Python sources and debian/ only; there
+are no vendored wheels and no third-party binaries, so no version of
+debian/source/include-binaries is needed and the orig tarball stays small.
+
+Build dependencies
+------------------
+  debhelper-compat (= 13), python3, python3-pip, python3-setuptools,
+  python3-wheel
+
+The build is offline: debian/rules calls
+
+  python3 -m pip wheel --no-deps --no-build-isolation .
+
+and installs the resulting pure-Python wheel into
+
+  /usr/lib/argus-scanner/argus_scanner-<version>-py3-none-any.whl
+
+If the wheel turns out not to be architecture independent, the build fails.
+
+  dpkg-buildpackage -us -uc -b
+
+Runtime provisioning
+--------------------
+The Python runtime is not built here.  debian/postinst runs
+argus-setup-runtime, which creates a virtual environment in
+/var/lib/argus-scanner/runtime and installs the wheel plus its dependencies
+(including Semgrep) from the package index.  That keeps the binary package
+small and independent of the local ABI, at the cost of requiring network
+access during installation.  Offline installations use
+`argus-setup-runtime --wheelhouse DIR` or set ARGUS_WHEELHOUSE.
+
+What the package installs
+-------------------------
+  /usr/lib/argus-scanner/argus_scanner-<version>-py3-none-any.whl
+  /usr/bin/argus
+  /usr/bin/argus-gui
+  /usr/bin/argus-setup-runtime
+  man pages and /usr/share/doc/argus-scanner/
+
+Rebuilding for another platform is not necessary: the wheel is pure Python
+and the dependencies are resolved on the target machine.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>

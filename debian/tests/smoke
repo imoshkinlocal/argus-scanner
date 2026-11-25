@@ -1,0 +1,44 @@
+#!/bin/sh
+# autopkgtest smoke test: the Java engine must report the classic
+# request.getParameter -> Statement.executeQuery injection.
+set -e
+
+if ! argus version >/dev/null 2>&1; then
+    echo "the argus runtime is not provisioned (no network during install); skipping"
+    exit 77
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+cat > "$work/Vulnerable.java" <<'EOF'
+import javax.servlet.http.*;
+
+public class Vulnerable extends HttpServlet {
+    public void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        String id = request.getParameter("id");
+        java.sql.Statement st = null;
+        st.executeQuery("SELECT * FROM users WHERE id = '" + id + "'");
+    }
+}
+EOF
+
+argus version
+set +e
+argus scan "$work" --no-sca --no-secrets --no-iac -q -f json -o "$work/report.json"
+status=$?
+set -e
+
+test "$status" -eq 1
+python3 - "$work/report.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    report = json.load(handle)
+
+rules = {finding["rule_id"] for finding in report["findings"]}
+if not any("sql" in rule for rule in rules):
+    raise SystemExit(f"SQL injection not detected; got: {sorted(rules)}")
+PY

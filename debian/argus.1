@@ -1,0 +1,169 @@
+.TH ARGUS 1 "2026-11-25" "argus 1.1.0" "User Commands"
+.SH NAME
+argus \- SAST and SCA security scanner
+.SH SYNOPSIS
+.B argus
+.I command
+.RI [ options ]
+.RI [ target ]
+.SH DESCRIPTION
+.B argus
+scans source code and dependency manifests.  It combines a built-in
+intra-file dataflow engine for Java, Semgrep rule packs for other
+languages, OSV-based dependency checks, secret detection and
+infrastructure-as-code heuristics.
+.PP
+Reports are written as JSON, SARIF, Markdown or plain text.  Dependency
+inventories can be exported as CycloneDX or SPDX SBOM, and SCA findings as
+OpenVEX.
+.SH COMMANDS
+.TP
+.B scan
+Run SAST and SCA together (the default entry point for a repository).
+.TP
+.B sast
+Run static analysis only.
+.TP
+.B sca
+Run dependency analysis only.
+.TP
+.B sbom
+Write a CycloneDX or SPDX SBOM, or verify an existing signed SBOM.
+.TP
+.B vex
+Export SCA findings from a JSON report as OpenVEX.
+.TP
+.B diff
+Compare two JSON reports (new, fixed and unchanged findings).
+.TP
+.B bench owasp
+Score an engine against the OWASP Benchmark.
+.TP
+.B bench sca
+Score the SCA engine against the bundled fixtures.
+.TP
+.B db update
+Download OSV archives for offline dependency scanning.
+.TP
+.B db status
+Show the local OSV, SAST and threat-intelligence caches.
+.TP
+.B rules list
+List the bundled Semgrep rules.
+.TP
+.B cwe
+Browse the built-in CWE reference.
+.TP
+.B version
+Print the argus, Python and Semgrep versions.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-format " " \fIjson\fR|\fIsarif\fR|\fItext\fR|\fImd\fR
+Select the report format (default: json).
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Write the report to a file instead of standard output.
+.TP
+.BR \-\-summary " " \fIFILE\fR
+Also write a human-readable Markdown summary.
+.TP
+.BR \-\-fail\-on " " \fIlevel\fR
+Exit with status 1 when a finding at or above this severity exists
+(default: high; use \fBnone\fR to disable).
+.TP
+.BR \-\-min\-severity " " \fIlevel\fR
+Drop findings below this severity.
+.TP
+.BR \-\-config " " \fIFILE\fR
+Load project configuration from an explicit argus.toml or argus.json.
+.TP
+.BR \-\-baseline " " \fIFILE\fR
+Mark findings present in the baseline as existing.
+.TP
+.BR \-\-baseline\-out " " \fIFILE\fR
+Write the current findings as a new baseline.
+.TP
+.BR \-\-fail\-on\-new
+Fail only on findings that are missing from the baseline.
+.TP
+.BR \-\-ignore " " \fIFILE\fR
+Load a suppression file (JSON, TOML or .argusignore); may be repeated.
+.TP
+.BR \-\-include\-suppressed
+Show suppressed findings in human-readable and SARIF reports.
+.TP
+.BR \-\-exclude " " \fIPATTERN\fR
+Skip paths matching a glob or directory name; may be repeated.
+.TP
+.BR \-\-jobs " " \fIN\fR
+Use N worker processes (default: 1).
+.TP
+.BR \-\-offline
+Use the local OSV database instead of the network API.
+.TP
+.BR \-\-db\-dir " " \fIDIR\fR
+Use an explicit directory for the offline OSV archives.
+.TP
+.BR \-\-no\-sast ", " \-\-no\-sca
+Disable one half of a combined scan.
+.TP
+.BR \-\-no\-secrets ", " \-\-no\-iac
+Disable secret detection or infrastructure-as-code checks.
+.TP
+.BR \-\-no\-sast\-cache
+Disable the content-addressed Java analysis cache.
+.TP
+.BR \-\-threat\-intel
+Enrich SCA findings with EPSS and CISA KEV data.
+.TP
+.BR \-\-no\-threat\-cache
+Do not reuse the downloaded EPSS/KEV data.
+.SH EXIT STATUS
+.TP
+.B 0
+No findings at or above the configured threshold, or the quality gate passed.
+.TP
+.B 1
+Findings at or above the threshold, or a quality gate violation.
+.TP
+.B 2
+A scan error occurred (missing target, unreachable data source, missing
+scanning backend).
+.SH FILES
+.TP
+.I /var/lib/argus-scanner/runtime
+Private Python environment with argus, its dependencies and Semgrep,
+created and updated by
+.BR argus-setup-runtime (1).
+.TP
+.I ~/.cache/argus
+Default cache directory for the OSV database, SAST cache and EPSS/KEV
+data.  Override it with \fBXDG_CACHE_HOME\fR or the corresponding options.
+.TP
+.I argus.toml , .argus.toml , argus.json , .argus.json
+Project configuration files, discovered upwards from the scan target.
+.SH EXAMPLES
+Scan a repository and write JSON plus a Markdown summary:
+.PP
+.nf
+argus scan ./src -f json -o report.json --summary report.md
+.fi
+.PP
+Run only the static analysis and emit SARIF:
+.PP
+.nf
+argus sast ./src -f sarif --fail-on high -o argus.sarif
+.fi
+.PP
+Work without network access:
+.PP
+.nf
+argus db update
+argus sca . --offline
+.fi
+.SH SEE ALSO
+.BR argus-gui (1),
+.BR argus-setup-runtime (1),
+.I /usr/share/doc/argus-scanner/README.Debian
+.SH AUTHOR
+argus contributors.

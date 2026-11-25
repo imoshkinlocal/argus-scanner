@@ -1,0 +1,39 @@
+argus-scanner (1.1.0-3) unstable; urgency=medium
+
+  * Make the binary package architecture independent (Architecture: all,
+    about 300 kB).  The wheel set is no longer vendored: the package ships
+    only the pure-Python argus wheel, and the runtime is built during
+    installation, so it always matches the local architecture and Python ABI.
+  * Install the latest Semgrep from PyPI when the package is configured,
+    which removes the need to rebuild the package for every Semgrep release.
+  * Replace argus-update-semgrep with argus-setup-runtime: it provisions,
+    upgrades, pins, lists and removes the runtime, and supports offline
+    installation from a wheel directory.
+  * Raise the Python requirement to 3.10, matching current Semgrep releases.
+  * Drop the vendored-wheel exception to Debian Policy 4.13: the source
+    package no longer contains third-party binaries.
+  * Remove the pip-managed Semgrep environment used by 1.1.0-2 on upgrade.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 20:00:00 +0300
+
+argus-scanner (1.1.0-2) unstable; urgency=medium
+
+  * Fetch the latest Semgrep from PyPI on first installation so the rule
+    engine can be updated independently of the package.  The bundled copy
+    remains as a fallback; the download is best-effort and an offline
+    installation still succeeds.
+  * Add argus-update-semgrep to install, upgrade, pin or remove that copy,
+    including offline installation from a wheel directory.
+  * Depend on python3-venv for the isolated Semgrep environment.
+  * Remove the pip-managed environment on purge.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 19:00:00 +0300
+
+argus-scanner (1.1.0-1) unstable; urgency=medium
+
+  * Initial Debian package.
+  * Bundle the Python dependency closure in a private runtime because
+    python3-tree-sitter, python3-tree-sitter-java and Semgrep are not
+    available in the Astra/Debian archive.
+
+ -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 18:00:00 +0300

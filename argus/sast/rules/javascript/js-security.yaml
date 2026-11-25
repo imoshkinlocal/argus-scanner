@@ -1,0 +1,178 @@
+rules:
+  - id: js-command-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A child process is started from a string. Use `execFile`/`spawn` with an
+      argument array and never pass `shell: true` with untrusted input.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: child_process.exec($CMD, ...)
+          - pattern: child_process.execSync($CMD, ...)
+          - pattern: $CP.exec($CMD, ...)
+          - pattern: $CP.execSync($CMD, ...)
+          - pattern: '$CP.spawn($CMD, ..., {shell: true}, ...)'
+      - pattern-not: child_process.exec("...", ...)
+      - pattern-not: child_process.execSync("...", ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+
+  - id: js-dynamic-code
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Dynamic code evaluation of non-literal input allows arbitrary script
+      execution.
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval($X, ...)
+          - pattern: new Function($X, ...)
+          - pattern: setTimeout($X, ...)
+          - pattern: setInterval($X, ...)
+      - pattern-not: eval("...", ...)
+      - pattern-not: new Function("...", ...)
+      - pattern-not: setTimeout("...", ...)
+      - pattern-not: setInterval("...", ...)
+
+  - id: js-xss-innerhtml
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Writing dynamic data to `innerHTML`, `outerHTML` or `document.write`
+      enables DOM XSS. Use `textContent` or sanitize with DOMPurify.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: HIGH
+    pattern-either:
+      - pattern: $EL.innerHTML = $X
+      - pattern: $EL.outerHTML = $X
+      - pattern: document.write($X)
+      - pattern: document.writeln($X)
+      - pattern: $EL.insertAdjacentHTML(..., $X)
+
+  - id: js-xss-react
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      `dangerouslySetInnerHTML` bypasses React's escaping. Sanitize the HTML
+      with DOMPurify before rendering.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: HIGH
+    pattern: '<$EL dangerouslySetInnerHTML={{__html: $X}} />'
+
+  - id: js-sql-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      SQL is assembled from dynamic data. Use parameterised queries
+      (`?`/`$1` placeholders) and pass values separately.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+    pattern-either:
+      - pattern: $DB.query("..." + $X, ...)
+      - pattern: $DB.query(`...${$X}...`, ...)
+      - pattern: $DB.execute("..." + $X, ...)
+      - pattern: $DB.execute(`...${$X}...`, ...)
+      - pattern: $DB.$METHOD($SQL + $X, ...)
+
+  - id: js-jwt-not-verified
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      The JWT is decoded without verifying its signature, or expiration checks
+      are disabled.
+    metadata:
+      cwe: "CWE-347: Improper Verification of Cryptographic Signature"
+      confidence: HIGH
+    pattern-either:
+      - pattern: jwt.decode($TOKEN, ...)
+      - pattern: jsonwebtoken.decode($TOKEN, ...)
+      - pattern: 'jwt.verify($TOKEN, $SECRET, {ignoreExpiration: true}, ...)'
+      - pattern: 'jwt.verify($TOKEN, $SECRET, {algorithms: ["none"]}, ...)'
+
+  - id: js-tls-verify-disabled
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      TLS certificate validation is disabled (`rejectUnauthorized: false` or
+      `NODE_TLS_REJECT_UNAUTHORIZED=0`).
+    metadata:
+      cwe: "CWE-295: Improper Certificate Validation"
+      confidence: HIGH
+    pattern-either:
+      - pattern: '$OPTS = {..., rejectUnauthorized: false, ...}'
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+
+  - id: js-weak-hash
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      MD5/SHA-1 are unsuitable for security purposes. Use SHA-256+ for
+      integrity and bcrypt/argon2 for passwords.
+    metadata:
+      cwe: "CWE-328: Use of Weak Hash"
+      confidence: HIGH
+    patterns:
+      - pattern: |
+          $CRYPTO.createHash($ALG, ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^["'](md5|sha1|md4|ripemd160)
+
+  - id: js-open-redirect
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A redirect target comes from dynamic data. Validate it against an
+      allow-list of paths before redirecting.
+    metadata:
+      cwe: "CWE-601: URL Redirection to Untrusted Site"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $RES.redirect($X)
+          - pattern: $RES.location = $X
+      - pattern-not: $RES.redirect("...")
+
+  - id: js-path-traversal
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      A filesystem path is built from dynamic data. Resolve it and verify it is
+      inside the intended root directory.
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: fs.readFile($PATH, ...)
+      - pattern: fs.readFileSync($PATH, ...)
+      - pattern: fs.createReadStream($PATH, ...)
+      - pattern: fs.writeFile($PATH, ...)
+      - pattern: fs.unlink($PATH, ...)
+    pattern-not: fs.readFile("...", ...)
+
+  - id: js-hardcoded-secret
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A credential or API key appears to be hardcoded. Use environment
+      variables or a secret manager.
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: MEDIUM
+    patterns:
+      - pattern: $VAR = "..."
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i)^(?:.*(?:password|passwd|secret|api_?key|apikey|token|private_?key).*)$
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ^(?!.*(?:placeholder|example|changeme|dummy|redacted)).*$

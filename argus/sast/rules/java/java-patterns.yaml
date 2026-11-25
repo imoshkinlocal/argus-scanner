@@ -1,0 +1,129 @@
+rules:
+  - id: java-weak-hash
+    languages: [java]
+    severity: WARNING
+    message: >-
+      MD5/SHA-1 are broken for security purposes. Use SHA-256 or stronger, or a
+      password hashing function such as Argon2, bcrypt or PBKDF2.
+    metadata:
+      cwe: "CWE-328: Use of Weak Hash"
+      confidence: HIGH
+    pattern-either:
+      - pattern: java.security.MessageDigest.getInstance($ALG)
+      - pattern: javax.crypto.Mac.getInstance($ALG)
+      - pattern: java.security.Signature.getInstance($ALG)
+    metavariable-regex:
+      metavariable: $ALG
+      regex: (?i)^"(MD[245]|SHA-?1)"
+
+  - id: java-weak-cipher
+    languages: [java]
+    severity: ERROR
+    message: >-
+      A broken or obsolete cipher is requested (DES, RC2, RC4, Blowfish).
+      Use AES-GCM with a random nonce instead.
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      confidence: HIGH
+    pattern-either:
+      - pattern: javax.crypto.Cipher.getInstance($ALG)
+      - pattern: javax.crypto.KeyGenerator.getInstance($ALG)
+    metavariable-regex:
+      metavariable: $ALG
+      regex: (?i)^"(DES|DESede|RC2|RC4|ARCFOUR|Blowfish)
+
+  - id: java-weak-random
+    languages: [java]
+    severity: WARNING
+    message: >-
+      `java.util.Random` and `Math.random()` are predictable. Use
+      `java.security.SecureRandom` for tokens, salts and identifiers.
+    metadata:
+      cwe: "CWE-330: Use of Insufficiently Random Values"
+      confidence: HIGH
+    pattern-either:
+      - pattern: new java.util.Random(...)
+      - pattern: (java.util.Random $R).nextInt(...)
+      - pattern: Math.random()
+
+  - id: java-insecure-cookie
+    languages: [java]
+    severity: WARNING
+    message: >-
+      The Secure flag is explicitly disabled on a cookie, so it can be sent over
+      plain HTTP.
+    metadata:
+      cwe: "CWE-614: Sensitive Cookie in HTTPS Session Without 'Secure' Attribute"
+      confidence: HIGH
+    pattern: $COOKIE.setSecure(false)
+
+  - id: java-httponly-cookie
+    languages: [java]
+    severity: WARNING
+    message: >-
+      HttpOnly is disabled on a cookie, exposing it to JavaScript and therefore
+      to XSS-based theft.
+    metadata:
+      cwe: "CWE-1004: Sensitive Cookie Without 'HttpOnly' Flag"
+      confidence: HIGH
+    pattern: $COOKIE.setHttpOnly(false)
+
+  - id: java-deserialization
+    languages: [java]
+    severity: ERROR
+    message: >-
+      Untrusted byte streams must not be deserialized: gadget chains allow
+      remote code execution. Prefer JSON with a strict schema.
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: new java.io.ObjectInputStream(...).readObject()
+      - pattern: $OIS.readObject()
+      - pattern: new java.io.ObjectInputStream(...)
+
+  - id: java-jndi-injection
+    languages: [java]
+    severity: ERROR
+    message: >-
+      JNDI lookups with attacker controlled names can lead to remote class
+      loading (Log4Shell class of bugs).
+    metadata:
+      cwe: "CWE-074: Injection"
+      confidence: MEDIUM
+    patterns:
+      - pattern: (javax.naming.Context $C).lookup($NAME)
+      - pattern-not: (javax.naming.Context $C).lookup("...")
+
+  - id: java-runtime-exec-literal
+    languages: [java]
+    severity: INFO
+    message: >-
+      Review this process invocation: the command must never contain
+      attacker-controlled fragments.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: LOW
+    pattern: Runtime.getRuntime().exec("...")
+
+  - id: java-hardcoded-password
+    languages: [java]
+    severity: WARNING
+    message: >-
+      A credential appears to be hardcoded. Move it to a secret store or an
+      environment variable.
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: |
+              String $VAR = "...";
+          - pattern: |
+              $TYPE $VAR = "...";
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i)(password|passwd|pwd|secret|apikey|api_key|token|credential)
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ^(?!.*(placeholder|example|changeme|dummy|redacted)).*$

@@ -1,0 +1,118 @@
+name: release
+
+# Publishes a GitHub Release with:
+#   * argus-<version>-linux-x86_64.tar.gz  - portable archive (own CPython + Semgrep)
+#   * argus-scanner_<version>_all.deb      - universal Debian package
+#   * SHA256SUMS
+#
+# No repository secrets are needed.  The workflow uses the automatic
+# GITHUB_TOKEN with the "contents: write" permission granted below.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing or new tag, e.g. v1.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  VERSION: '1.1.0'
+  SEMGREP_VERSION: '1.187.0'
+  PBS_URL: 'https://github.com/astral-sh/python-build-standalone/releases/download/20261124/cpython-3.11.18%2B20261124-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz'
+  PBS_SHA256: 'd873f435e58d396a18858d4f52a335f1abe8cea385cb9d411ec511f958249d54'
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            debhelper python3-pip python3-setuptools python3-wheel python3-venv
+
+      - name: Build the argus wheel
+        run: python3 -m pip wheel --no-deps --no-build-isolation -w wheelhouse .
+
+      - name: Assemble the portable archive
+        run: |
+          set -eux
+          B="staging/argus-$VERSION-linux-x86_64"
+          mkdir -p "$B"
+          cp packaging/portable/argus packaging/portable/argus-gui \
+             packaging/portable/update-semgrep.sh packaging/portable/README.md \
+             packaging/portable/BUNDLE.txt packaging/portable/THIRD-PARTY-NOTICES.md "$B/"
+          cp -r packaging/licenses "$B/licenses"
+          cp LICENSE "$B/LICENSE"
+          cp README.md "$B/README-argus.md"
+          chmod 0755 "$B/argus" "$B/argus-gui" "$B/update-semgrep.sh"
+
+          # Relocatable CPython with its own pip.
+          curl -sSL -o pbs.tar.gz "$PBS_URL"
+          echo "$PBS_SHA256  pbs.tar.gz" | sha256sum -c -
+          mkdir -p "$B/python"
+          tar xzf pbs.tar.gz -C "$B/python" --strip-components=1
+          rm -rf "$B"/python/lib/python3.11/{ensurepip,idlelib,lib2to3} \
+                 "$B"/python/include "$B"/python/share/man
+
+          # Install the runtime with the *bundled* interpreter: wheels must
+          # match its ABI (cp311), not the runner's Python.
+          "$B/python/bin/python3.11" -m pip install --no-cache-dir --no-compile \
+            --target "$B/runtime" wheelhouse/argus_scanner-*.whl \
+            "semgrep==$SEMGREP_VERSION"
+
+          # Console scripts must not point at the build directory.
+          for f in "$B"/runtime/bin/*; do
+            if [ "$(head -c2 "$f")" = '#!' ]; then
+              sed -i '1s|^#!.*|#!/usr/bin/env python3|' "$f"
+            fi
+          done
+
+          tar czf "staging/argus-$VERSION-linux-x86_64.tar.gz" -C staging \
+            "argus-$VERSION-linux-x86_64"
+
+      - name: Smoke test the archive
+        run: |
+          set -eux
+          mkdir -p /tmp/check
+          tar xzf "staging/argus-$VERSION-linux-x86_64.tar.gz" -C /tmp/check
+          "/tmp/check/argus-$VERSION-linux-x86_64/argus" version
+          "/tmp/check/argus-$VERSION-linux-x86_64/argus" --help >/dev/null
+
+      - name: Build the universal .deb
+        run: |
+          set -eux
+          dpkg-buildpackage -us -uc -b
+          ls -l ../argus-scanner_*.deb
+
+      - name: Checksums
+        run: |
+          set -eux
+          cd staging
+          cp ../argus-scanner_*.deb .
+          sha256sum "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -eux
+          cd staging
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" --clobber \
+              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb SHA256SUMS
+          else
+            gh release create "$TAG" --title "argus $VERSION" \
+              --notes-file ../packaging/RELEASE-NOTES.md \
+              "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb SHA256SUMS
+          fi

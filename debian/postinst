@@ -1,0 +1,50 @@
+#!/bin/sh
+# Provision the private Python runtime (including the latest Semgrep) on
+# installation.  The download is best-effort: an offline installation must
+# still succeed, because the administrator can run argus-setup-runtime later
+# or point it at a local wheel directory.
+set -e
+
+[ "$1" = "configure" ] || exit 0
+
+unset PYTHONPATH PYTHONHOME
+
+# Layout used by argus-scanner 1.1.0-2 and earlier.
+rm -rf /var/lib/argus-scanner/semgrep-venv
+
+if [ -x /var/lib/argus-scanner/runtime/bin/argus ] && \
+        [ "${ARGUS_FORCE_RUNTIME_SETUP:-0}" != "1" ]; then
+    exit 0
+fi
+
+if [ "${ARGUS_SKIP_RUNTIME_SETUP:-0}" = "1" ]; then
+    echo "argus-scanner: ARGUS_SKIP_RUNTIME_SETUP=1, skipping the runtime download"
+    echo "argus-scanner: run 'sudo argus-setup-runtime' when network is available"
+    exit 0
+fi
+
+# Offline installations can point at a wheel directory, either through the
+# environment of the package manager or through a one-line configuration file.
+WHEELHOUSE="${ARGUS_WHEELHOUSE:-}"
+if [ -z "$WHEELHOUSE" ] && [ -r /etc/argus-scanner/wheelhouse ]; then
+    WHEELHOUSE=$(sed -n '1s/[[:space:]]*$//p' /etc/argus-scanner/wheelhouse)
+fi
+
+echo "argus-scanner: installing the Python runtime (this may take a few minutes)"
+setup_failed=0
+if [ -n "$WHEELHOUSE" ]; then
+    echo "argus-scanner: using the wheel directory $WHEELHOUSE"
+    argus-setup-runtime --wheelhouse "$WHEELHOUSE" || setup_failed=1
+else
+    argus-setup-runtime || setup_failed=1
+fi
+
+if [ "${setup_failed:-0}" != "0" ]; then
+    echo "argus-scanner: the runtime could not be installed." >&2
+    echo "argus-scanner: run 'sudo argus-setup-runtime' when network is available," >&2
+    echo "argus-scanner: or 'sudo argus-setup-runtime --wheelhouse DIR' offline." >&2
+fi
+
+exit 0
+
+#DEBHELPER#

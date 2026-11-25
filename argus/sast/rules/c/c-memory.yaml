@@ -1,0 +1,153 @@
+rules:
+  - id: c-unbounded-copy
+    languages: [c]
+    severity: ERROR
+    message: >-
+      Unbounded string copy functions overflow the destination buffer. Use
+      `strlcpy`/`snprintf` or track the buffer size explicitly.
+    metadata:
+      cwe: "CWE-120: Buffer Copy without Checking Size of Input"
+      confidence: HIGH
+    pattern-either:
+      - pattern: strcpy($DST, $SRC)
+      - pattern: strcat($DST, $SRC)
+      - pattern: sprintf($DST, ...)
+      - pattern: gets($DST)
+      - pattern: stpcpy($DST, $SRC)
+
+  - id: c-unsafe-memory-copy
+    languages: [c, cpp]
+    severity: WARNING
+    message: >-
+      Verify that the copy length cannot exceed the destination buffer size.
+      Element-size copies (`sizeof(...)`, optionally multiplied) and copies whose
+      length comes from the allocation of the destination are treated as
+      intentional and are not reported.
+    metadata:
+      cwe: "CWE-787: Out-of-bounds Write"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: memcpy($DST, $SRC, $LEN)
+          - pattern: memmove($DST, $SRC, $LEN)
+          - pattern: bcopy($SRC, $DST, $LEN)
+      # A length of sizeof(T) (or sizeof(T) * n) is an element count, not an
+      # attacker controlled byte count.
+      - pattern-not: memcpy($DST, $SRC, sizeof(...))
+      - pattern-not: memcpy($DST, $SRC, sizeof(...) * ...)
+      - pattern-not: memmove($DST, $SRC, sizeof(...))
+      - pattern-not: memmove($DST, $SRC, sizeof(...) * ...)
+      - pattern-not: bcopy($SRC, $DST, sizeof(...))
+      - pattern-not: bcopy($SRC, $DST, sizeof(...) * ...)
+      # The destination was allocated with exactly the number of bytes copied.
+      - pattern-not-inside: |
+          $DST = $ALLOC($LEN);
+          ...
+      - pattern-not-inside: |
+          $T $DST = $ALLOC($LEN);
+          ...
+      - pattern-not-inside: |
+          $T *$DST = $ALLOC($LEN);
+          ...
+      # Allocations often reserve one extra byte for the terminator.
+      - pattern-not-inside: |
+          $DST = $ALLOC($LEN + $EXTRA);
+          ...
+      - pattern-not-inside: |
+          $T $DST = $ALLOC($LEN + $EXTRA);
+          ...
+      - pattern-not-inside: |
+          $T *$DST = $ALLOC($LEN + $EXTRA);
+          ...
+
+  - id: c-command-injection
+    languages: [c]
+    severity: ERROR
+    message: >-
+      A shell command is executed with dynamic data. Use `execv` with an
+      argument vector and validate inputs.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: system($CMD)
+          - pattern: popen($CMD, $MODE)
+      - pattern-not: system("...")
+      - pattern-not: popen("...", $MODE)
+
+  - id: c-format-string
+    languages: [c]
+    severity: ERROR
+    message: >-
+      A non-literal format string can read or write arbitrary stack memory.
+      Always pass a literal format such as `"%s"`.
+    metadata:
+      cwe: "CWE-134: Use of Externally-Controlled Format String"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: printf($FMT, ...)
+          - pattern: fprintf($FP, $FMT, ...)
+          - pattern: sprintf($DST, $FMT, ...)
+          - pattern: snprintf($DST, $LEN, $FMT, ...)
+          - pattern: syslog($PRI, $FMT, ...)
+      - pattern-not: printf("...", ...)
+      - pattern-not: fprintf($FP, "...", ...)
+      - pattern-not: sprintf($DST, "...", ...)
+      - pattern-not: snprintf($DST, $LEN, "...", ...)
+
+  - id: c-insecure-tempfile
+    languages: [c, cpp]
+    severity: WARNING
+    message: >-
+      `tmpnam`/`mktemp` are racy: the name can be claimed by another process
+      before it is opened. Use `mkstemp`.
+    metadata:
+      cwe: "CWE-377: Insecure Temporary File"
+      confidence: HIGH
+    pattern-either:
+      - pattern: tmpnam($BUF)
+      - pattern: mktemp($TEMPLATE)
+
+  - id: c-world-writable
+    languages: [c, cpp]
+    severity: WARNING
+    message: >-
+      World-writable permissions on a sensitive file allow local tampering.
+    metadata:
+      cwe: "CWE-732: Incorrect Permission Assignment for Critical Resource"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: chmod($PATH, 0777)
+      - pattern: chmod($PATH, 0666)
+      - pattern: umask(0)
+
+  - id: c-weak-random
+    languages: [c]
+    severity: WARNING
+    message: >-
+      `rand()`/`random()` are predictable. Use `getrandom`/`/dev/urandom` (or
+      `RAND_bytes`) for security-sensitive values.
+    metadata:
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: rand()
+      - pattern: srand($SEED)
+      - pattern: random()
+
+  - id: c-weak-crypto
+    languages: [c]
+    severity: ERROR
+    message: >-
+      DES/RC4/MD5 primitives are obsolete. Use AES-GCM and SHA-256+.
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      confidence: HIGH
+    pattern-either:
+      - pattern: EVP_des_ecb()
+      - pattern: EVP_des_cbc()
+      - pattern: EVP_rc4()
+      - pattern: MD5(...)
+      - pattern: SHA1(...)

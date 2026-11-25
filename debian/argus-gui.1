@@ -1,0 +1,20 @@
+.TH ARGUS-GUI 1 "2026-11-25" "argus 1.1.0" "User Commands"
+.SH NAME
+argus-gui \- desktop front-end for the argus security scanner
+.SH SYNOPSIS
+.B argus-gui
+.SH DESCRIPTION
+.B argus-gui
+starts the Tk front-end shipped with
+.BR argus (1).
+It can start a scan, browse findings, filter and sort results, inspect
+dependency trees and compare two JSON reports.
+.PP
+The GUI requires tkinter and a working display.  Install
+.B python3-tk
+and make sure \fBDISPLAY\fR or \fBWAYLAND_DISPLAY\fR is set.
+.SH SEE ALSO
+.BR argus (1),
+.I /usr/share/doc/argus-scanner/README.md
+.SH AUTHOR
+argus contributors.

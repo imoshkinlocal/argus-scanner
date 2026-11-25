@@ -1,0 +1,185 @@
+#!/bin/sh
+# Provision, upgrade or remove the Python runtime used by argus.
+#
+#   argus-setup-runtime                     install or rebuild with current releases
+#   argus-setup-runtime --wheelhouse DIR    install offline from a wheel directory
+#   argus-setup-runtime --semgrep VERSION   pin Semgrep to VERSION
+#   argus-setup-runtime --upgrade-semgrep   update only Semgrep in the runtime
+#   argus-setup-runtime --list              show the installed versions
+#   argus-setup-runtime --remove            delete the runtime
+#
+# The runtime is a virtual environment in /var/lib/argus-scanner/runtime,
+# created from the argus wheel shipped in this package plus its dependencies
+# from the Python package index.  Because nothing binary is baked into the
+# package, the result always matches the local Python ABI and architecture.
+set -e
+
+# pip only writes inside the virtual environment.  Debian's PEP 668 marker
+# ("externally-managed-environment") applies to the system interpreter, and
+# pip skips the check when it runs inside a venv.
+unset PYTHONPATH PYTHONHOME
+
+VENV=/var/lib/argus-scanner/runtime
+WHEEL_DIR=/usr/lib/argus-scanner
+ACTION=install
+SEMGREP=
+WHEELHOUSE=
+
+usage() {
+    cat <<'EOF'
+Usage: argus-setup-runtime [OPTION]...
+
+Install or update the Python runtime used by argus.
+
+  --wheelhouse DIR      install offline from a directory of wheels
+  --semgrep VERSION     pin Semgrep to VERSION (default: latest release)
+  --upgrade-semgrep     update only Semgrep, keep everything else as is
+  --list                show the installed versions
+  --remove              delete the runtime
+  -h, --help            show this help
+
+Without options the runtime is rebuilt from the argus wheel in this package
+and the current releases of its dependencies, so Semgrep is updated as well.
+EOF
+    exit 0
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --wheelhouse)
+            shift
+            [ $# -gt 0 ] || { echo "error: --wheelhouse needs a directory" >&2; exit 2; }
+            WHEELHOUSE="$1"
+            ;;
+        --semgrep)
+            shift
+            [ $# -gt 0 ] || { echo "error: --semgrep needs a version" >&2; exit 2; }
+            SEMGREP="$1"
+            ;;
+        --upgrade-semgrep) ACTION=upgrade ;;
+        --list) ACTION=list ;;
+        --remove) ACTION=remove ;;
+        -h|--help) usage ;;
+        *)
+            echo "error: unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
+require_root() {
+    [ "$(id -u)" -eq 0 ] && return 0
+    [ -w "$(dirname "$VENV")" ] && return 0
+    echo "error: run as root (the runtime lives in /var/lib/argus-scanner)" >&2
+    exit 2
+}
+
+report() {
+    echo "runtime: $VENV"
+    echo "python:  $("$VENV/bin/python" -V 2>&1)"
+    echo "argus:   $("$VENV/bin/argus" version 2>/dev/null | head -n 1)"
+    echo "semgrep: $("$VENV/bin/semgrep" --version 2>/dev/null | tail -n 1)"
+    echo "size:    $(du -sh "$VENV" 2>/dev/null | cut -f 1)"
+}
+
+pip_install() {
+    # All arguments are passed to pip verbatim.
+    "$VENV/bin/pip" install \
+        --disable-pip-version-check --no-input --no-compile --no-cache-dir "$@"
+}
+
+case "$ACTION" in
+    list)
+        if [ ! -x "$VENV/bin/argus" ]; then
+            echo "runtime: not installed ($VENV)"
+            exit 0
+        fi
+        report
+        exit 0
+        ;;
+    remove)
+        require_root
+        rm -rf "$VENV"
+        echo "removed $VENV"
+        exit 0
+        ;;
+esac
+
+require_root
+
+if [ "$ACTION" = "upgrade" ]; then
+    if [ ! -x "$VENV/bin/semgrep" ]; then
+        echo "error: the runtime is not installed; run '$0' first" >&2
+        exit 1
+    fi
+
+    previous=$("$VENV/bin/semgrep" --version 2>/dev/null | tail -n 1)
+    spec="semgrep${SEMGREP:+==$SEMGREP}"
+
+    if [ -n "$WHEELHOUSE" ]; then
+        ok=0
+        pip_install --no-index --find-links "$WHEELHOUSE" --upgrade "$spec" || ok=1
+    else
+        ok=0
+        pip_install --upgrade "$spec" || ok=1
+    fi
+    if [ "$ok" -ne 0 ]; then
+        echo "error: could not update $spec" >&2
+        exit 1
+    fi
+
+    if ! "$VENV/bin/semgrep" --version >/dev/null 2>&1; then
+        echo "error: the new Semgrep does not run" >&2
+        if [ -n "$previous" ]; then
+            echo "       rolling back to $previous" >&2
+            pip_install --force-reinstall "semgrep==$previous" >/dev/null 2>&1 || true
+        fi
+        exit 1
+    fi
+
+    report
+    exit 0
+fi
+
+# Full (re)install.
+wheel=$(ls "$WHEEL_DIR"/argus_scanner-*.whl 2>/dev/null | head -n 1)
+if [ -z "$wheel" ]; then
+    echo "error: no argus wheel found in $WHEEL_DIR" >&2
+    exit 2
+fi
+if ! python3 -c 'import venv, ensurepip' >/dev/null 2>&1; then
+    echo "error: python3-venv is required (apt install python3-venv)" >&2
+    exit 2
+fi
+
+install -d -m 0755 "$(dirname "$VENV")"
+rm -rf "$VENV"
+if ! python3 -m venv "$VENV"; then
+    rm -rf "$VENV"
+    echo "error: could not create a virtual environment in $VENV" >&2
+    exit 1
+fi
+
+spec="semgrep${SEMGREP:+==$SEMGREP}"
+if [ -n "$WHEELHOUSE" ]; then
+    ok=0
+    pip_install --no-index --find-links "$WHEELHOUSE" "$wheel" "$spec" || ok=1
+else
+    ok=0
+    pip_install "$wheel" "$spec" || ok=1
+fi
+if [ "$ok" -ne 0 ]; then
+    rm -rf "$VENV"
+    echo "error: could not install the Python runtime" >&2
+    echo "       offline? prepare a wheel directory and use --wheelhouse DIR" >&2
+    exit 1
+fi
+
+if ! "$VENV/bin/argus" version >/dev/null 2>&1; then
+    rm -rf "$VENV"
+    echo "error: the installed runtime does not run" >&2
+    exit 1
+fi
+
+report

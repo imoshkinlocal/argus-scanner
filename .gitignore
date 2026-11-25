@@ -1,0 +1,28 @@
+# Virtual environments and build products
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated reports and benchmark output
+argus-report*.json
+argus-report*.md
+benchmark_results/
+
+# Debian build leftovers
+debian/.build/
+debian/argus-scanner/
+debian/files
+debian/*.substvars
+debian/*.debhelper*
+debian/tmp/
+
+# Editors and OS
+.DS_Store
+*.swp

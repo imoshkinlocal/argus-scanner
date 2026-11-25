@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+# Debian rules for argus-scanner.
+#
+# The binary package is architecture independent: it ships only the pure
+# Python wheel of argus plus launchers.  Everything else is downloaded on
+# installation into a private virtual environment, so the dependencies match
+# the target Python ABI and architecture and Semgrep is always current.
+
+export LC_ALL := C.UTF-8
+export PYTHONPATH :=
+
+PYTHON ?= /usr/bin/python3
+DESTDIR_INSTALL := debian/argus-scanner
+LIBDIR := $(DESTDIR_INSTALL)/usr/lib/argus-scanner
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	@:
+
+override_dh_auto_build:
+	rm -rf debian/.build
+	install -d debian/.build
+	$(PYTHON) -m pip wheel --no-deps --no-build-isolation --wheel-dir debian/.build .
+	@set -e; \
+	if ! ls debian/.build/argus_scanner-*-py3-none-any.whl >/dev/null 2>&1; then \
+		echo "error: the built wheel is not architecture independent" >&2; \
+		exit 1; \
+	fi
+
+override_dh_auto_test:
+	@echo "Skipping the upstream pytest suite (pytest is not a build dependency)."
+
+override_dh_auto_install:
+	rm -rf $(DESTDIR_INSTALL)
+	install -d $(LIBDIR)
+	install -m 0644 debian/.build/argus_scanner-*-py3-none-any.whl $(LIBDIR)/
+	install -d $(DESTDIR_INSTALL)/usr/bin
+	install -m 0755 debian/wrappers/argus $(DESTDIR_INSTALL)/usr/bin/argus
+	install -m 0755 debian/wrappers/argus-gui $(DESTDIR_INSTALL)/usr/bin/argus-gui
+	install -m 0755 debian/wrappers/argus-setup-runtime \
+		$(DESTDIR_INSTALL)/usr/bin/argus-setup-runtime
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf debian/.build
+
+override_dh_strip:
+	# Nothing to strip: the package contains no compiled objects.

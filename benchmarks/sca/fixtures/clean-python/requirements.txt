@@ -1,0 +1,4 @@
+# Versions verified against OSV to have no published advisories.
+six==1.17.0
+click==8.1.7
+packaging==24.1

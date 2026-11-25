@@ -1,0 +1,4 @@
+usr/bin/argus usr/bin/argus-scanner
+usr/bin/argus-gui usr/bin/argus-scanner-gui
+usr/share/man/man1/argus.1 usr/share/man/man1/argus-scanner.1
+usr/share/man/man1/argus-gui.1 usr/share/man/man1/argus-scanner-gui.1

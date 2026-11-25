@@ -1,0 +1,15 @@
+#!/bin/sh
+# Remove the private Python runtime on purge.  On plain removal it is kept so
+# a reinstall does not have to download everything again.
+set -e
+
+case "$1" in
+    purge)
+        rm -rf /var/lib/argus-scanner
+        rm -rf /etc/argus-scanner
+        ;;
+esac
+
+exit 0
+
+#DEBHELPER#

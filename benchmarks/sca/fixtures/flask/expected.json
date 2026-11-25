@@ -1,0 +1,7 @@
+{
+  "description": "Flask 1.0 and Jinja2 2.10 carry known CVEs.",
+  "findings": [
+    {"package": "flask", "version": "1.0", "vulns": ["CVE-2023-30861", "CVE-2026-27205"]},
+    {"package": "jinja2", "version": "2.10", "vulns": ["CVE-2019-10906", "CVE-2020-28493"]}
+  ]
+}

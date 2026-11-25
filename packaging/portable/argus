@@ -1,0 +1,40 @@
+#!/bin/sh
+# Self-contained launcher: uses the Python interpreter shipped in this archive.
+set -e
+SELF=$0
+while [ -L "$SELF" ]; do
+    LINK=$(readlink "$SELF")
+    case $LINK in
+        /*) SELF=$LINK ;;
+        *) SELF=$(dirname "$SELF")/$LINK ;;
+    esac
+done
+ROOT=$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)
+PY="$ROOT/python/bin/python3.11"
+
+export PYTHONNOUSERSITE=1
+export PYTHONPATH="$ROOT/semgrep-overlay:$ROOT/runtime"
+export PATH="$ROOT/python/bin:$ROOT/runtime/bin:$PATH"
+
+# Minimal systems may have no ca-certificates package; Semgrep refuses to
+# build a TLS context without a trust anchor.  Use the bundled certifi store.
+CERT="$ROOT/runtime/certifi/cacert.pem"
+if [ -r "$CERT" ] && [ -z "${SSL_CERT_FILE:-}" ]; then
+    SSL_CERT_FILE="$CERT"
+    export SSL_CERT_FILE
+    REQUESTS_CA_BUNDLE="$CERT"
+    export REQUESTS_CA_BUNDLE
+    CURL_CA_BUNDLE="$CERT"
+    export CURL_CA_BUNDLE
+fi
+
+if [ -z "${ARGUS_SEMGREP:-}" ]; then
+    if [ -x "$ROOT/semgrep-overlay/bin/semgrep" ]; then
+        ARGUS_SEMGREP="$ROOT/semgrep-overlay/bin/semgrep"
+    else
+        ARGUS_SEMGREP="$ROOT/runtime/bin/semgrep"
+    fi
+fi
+export ARGUS_SEMGREP
+
+exec "$PY" -m argus.cli "$@"

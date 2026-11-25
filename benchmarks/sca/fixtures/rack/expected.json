@@ -1,0 +1,6 @@
+{
+  "description": "Rack 2.0.6 is affected by session fixation and multipart parsing issues.",
+  "findings": [
+    {"package": "rack", "version": "2.0.6", "vulns": ["CVE-2019-16782", "CVE-2022-30123", "CVE-2020-8161"]}
+  ]
+}

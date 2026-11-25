@@ -1,0 +1,9 @@
+tar-ignore = .venv
+tar-ignore = .pytest_cache
+tar-ignore = __pycache__
+tar-ignore = *.pyc
+tar-ignore = *.egg-info
+tar-ignore = argus-report*.json
+tar-ignore = argus-report*.md
+tar-ignore = benchmark_results
+tar-ignore = dist

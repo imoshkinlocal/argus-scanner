@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argus-scanner"
+version = "1.1.0"
+description = "SAST + SCA scanner: Java dataflow engine, Semgrep rule packs and OSV dependency checks"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "argus contributors" }]
+keywords = ["security", "sast", "sca", "semgrep", "osv", "owasp-benchmark"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+dependencies = [
+    "tree-sitter>=0.22,<0.27",
+    "tree-sitter-java>=0.21",
+]
+
+[project.optional-dependencies]
+semgrep = ["semgrep>=1.60"]
+dev = ["pytest>=7", "semgrep>=1.60"]
+
+[project.scripts]
+argus = "argus.cli:main"
+argus-gui = "argus.gui:main"
+
+[tool.setuptools]
+packages = ["argus", "argus.output", "argus.sca", "argus.sast", "argus.sast.java", "argus.bench"]
+
+[tool.setuptools.package-data]
+argus = ["sast/rules/**/*.yaml", "sast/rules/**/*.yml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

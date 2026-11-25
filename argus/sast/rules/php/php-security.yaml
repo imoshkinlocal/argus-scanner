@@ -1,0 +1,145 @@
+rules:
+  - id: php-command-injection
+    languages: [php]
+    severity: ERROR
+    message: >-
+      A shell command is executed with dynamic data. Use `escapeshellarg` on
+      every fragment or avoid the shell.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: system($CMD, ...)
+          - pattern: exec($CMD, ...)
+          - pattern: shell_exec($CMD)
+          - pattern: passthru($CMD, ...)
+          - pattern: popen($CMD, ...)
+          - pattern: proc_open($CMD, ...)
+      - pattern-not: system("...", ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: shell_exec("...")
+      - pattern-not: passthru("...", ...)
+      - pattern-not: popen("...", ...)
+
+  - id: php-code-execution
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Dynamic code evaluation allows arbitrary PHP execution.
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval($CODE)
+          - pattern: assert($CODE)
+      - pattern-not: eval("...")
+      - pattern-not: assert("...")
+
+  - id: php-unsafe-unserialize
+    languages: [php]
+    severity: ERROR
+    message: >-
+      `unserialize` on untrusted data can instantiate arbitrary objects and
+      trigger gadget chains. Use `json_decode` with `allowed_classes: false`.
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confidence: HIGH
+    pattern: unserialize($DATA, ...)
+
+  - id: php-file-inclusion
+    languages: [php]
+    severity: ERROR
+    message: >-
+      A file path for include/require comes from request data, enabling local
+      or remote file inclusion.
+    metadata:
+      cwe: "CWE-98: Improper Control of Filename for Include/Require Statement"
+      confidence: HIGH
+    pattern-either:
+      - pattern: include $_GET[...]
+      - pattern: include $_POST[...]
+      - pattern: include $_REQUEST[...]
+      - pattern: require $_GET[...]
+      - pattern: require $_POST[...]
+      - pattern: require_once $_REQUEST[...]
+      - pattern: include_once $_GET[...]
+
+  - id: php-sql-injection
+    languages: [php]
+    severity: ERROR
+    message: >-
+      SQL is built from dynamic data. Use PDO prepared statements with bound
+      parameters.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+    pattern-either:
+      - pattern: mysqli_query($C, "..." . $X)
+      - pattern: mysqli_query($C, "...$X...")
+      - pattern: mysql_query("..." . $X)
+      - pattern: $PDO->query("..." . $X)
+      - pattern: $PDO->exec("..." . $X)
+      - pattern: $DB->query("..." . $X)
+      - pattern: $WPDB->query("...$X...")
+      - pattern: $WPDB->get_results("...$X...")
+
+  - id: php-xss
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Request data is echoed directly into the page. Escape it with
+      `htmlspecialchars($value, ENT_QUOTES, 'UTF-8')`.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: echo $X;
+          - pattern: print $X;
+          - pattern: print_r($X, ...);
+      - metavariable-regex:
+          metavariable: $X
+          regex: ^\$_(GET|POST|REQUEST|COOKIE)
+
+  - id: php-weak-hash
+    languages: [php]
+    severity: WARNING
+    message: >-
+      MD5/SHA-1 are unsuitable for passwords. Use `password_hash()` with
+      PASSWORD_DEFAULT.
+    metadata:
+      cwe: "CWE-328: Use of Weak Hash"
+      confidence: HIGH
+    pattern-either:
+      - pattern: md5($X, ...)
+      - pattern: sha1($X, ...)
+
+  - id: php-insecure-upload
+    languages: [php]
+    severity: WARNING
+    message: >-
+      Uploaded files must be validated (type, size, name) and stored outside the
+      web root with a generated name.
+    metadata:
+      cwe: "CWE-434: Unrestricted Upload of File with Dangerous Type"
+      confidence: MEDIUM
+    pattern: move_uploaded_file($_FILES[...], $DEST)
+
+  - id: php-hardcoded-secret
+    languages: [php]
+    severity: WARNING
+    message: >-
+      A credential appears to be hardcoded. Load it from the environment.
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: MEDIUM
+    patterns:
+      - pattern: $VAR = "..."
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i)^\$?(?:.*(?:password|passwd|secret|apikey|api_?key|token).*)$
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: ^(?!.*(?:placeholder|example|changeme|dummy)).*$

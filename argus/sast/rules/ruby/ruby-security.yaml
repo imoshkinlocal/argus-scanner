@@ -1,0 +1,254 @@
+rules:
+  - id: ruby-command-injection
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      A shell command is executed with a dynamic first argument. Pass the
+      command as an argument array (`system("ls", "-l")`) and validate every
+      value, or use `Open3.capture3` with separate arguments.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: system($CMD, ...)
+          - pattern: exec($CMD, ...)
+          - pattern: spawn($CMD, ...)
+          - pattern: Kernel.system($CMD, ...)
+          - pattern: Kernel.exec($CMD, ...)
+          - pattern: IO.popen($CMD, ...)
+          - pattern: Open3.capture3($CMD, ...)
+          - pattern: Open3.capture2($CMD, ...)
+      - pattern-not: system("...", ...)
+      - pattern-not: system([...], ...)
+      - pattern-not: exec("...", ...)
+      - pattern-not: exec([...], ...)
+      - pattern-not: spawn("...", ...)
+      - pattern-not: spawn([...], ...)
+      - pattern-not: Kernel.system("...", ...)
+      - pattern-not: Kernel.exec("...", ...)
+      - pattern-not: IO.popen("...", ...)
+      - pattern-not: IO.popen([...], ...)
+      - pattern-not: Open3.capture3("...", ...)
+      - pattern-not: Open3.capture2("...", ...)
+
+  - id: ruby-command-interpolation
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      A backtick or `%x{}` command interpolates dynamic data. Use
+      `Open3.capture3` with separate arguments instead.
+    metadata:
+      cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+    pattern-regex: |-
+      (?:`[^`\n]*#\{[^}\n]*\}[^`\n]*`|%x\{[^}\n]*#\{[^}\n]*\}[^}\n]*\})
+
+  - id: ruby-dynamic-code
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      Dynamic code evaluation of non-literal input allows arbitrary code
+      execution. Parse data with a schema instead of evaluating it.
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval($CODE, ...)
+          - pattern: instance_eval($CODE, ...)
+          - pattern: class_eval($CODE, ...)
+          - pattern: module_eval($CODE, ...)
+      - pattern-not: eval("...", ...)
+      - pattern-not: instance_eval("...", ...)
+      - pattern-not: class_eval("...", ...)
+      - pattern-not: module_eval("...", ...)
+      # Metaprogramming over constants and block-pass invocation is common and
+      # safe; require the evaluated value to look like external input.
+      - metavariable-regex:
+          metavariable: $CODE
+          regex: (?i)(params?|request|cookies?|argv|env\b|user_?input|input|body|data|query)
+
+  - id: ruby-marshal-load
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      `Marshal.load` deserialises arbitrary objects and can lead to remote code
+      execution. Use JSON or a signed, versioned message format.
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confidence: HIGH
+    pattern-either:
+      - pattern: Marshal.load($DATA, ...)
+      - pattern: Marshal.restore($DATA, ...)
+
+  - id: ruby-yaml-load
+    languages: [ruby]
+    severity: WARNING
+    message: >-
+      Unsafe YAML loading can instantiate arbitrary classes. Use
+      `YAML.safe_load` with an explicit `permitted_classes` list.
+    metadata:
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: YAML.load($DATA, ...)
+      - pattern: YAML.load_file($PATH, ...)
+      - pattern: YAML.unsafe_load($DATA, ...)
+      - pattern: Psych.load($DATA, ...)
+      - pattern: Psych.unsafe_load($DATA, ...)
+
+  - id: ruby-sql-injection
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      SQL is assembled from dynamic data. Use bind parameters
+      (`where("id = ?", id)`) instead of concatenation.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: $DB.execute("..." + $X, ...)
+          - pattern: $DB.exec("..." + $X, ...)
+          - pattern: $DB.exec_query("..." + $X, ...)
+          - pattern: $DB.query("..." + $X, ...)
+          - pattern: $DB.find_by_sql("..." + $X, ...)
+          - pattern: $DB.where("..." + $X, ...)
+      - pattern-not: $DB.execute("...", ...)
+      - pattern-not: $DB.exec("...", ...)
+      - pattern-not: $DB.exec_query("...", ...)
+      - pattern-not: $DB.query("...", ...)
+      - pattern-not: $DB.find_by_sql("...", ...)
+      - pattern-not: $DB.where("...", ...)
+
+  - id: ruby-sql-interpolation
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      SQL is interpolated into a query string. Use bind parameters so the
+      driver escapes the value.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      confidence: HIGH
+    pattern-regex: |-
+      (?i)(?:execute|exec_query|find_by_sql|where|having|order)\s*\(?\s*["'][^"']*#\{
+
+  - id: ruby-xss-raw
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      HTML is rendered without escaping. Use the default escaped output and
+      sanitise user input with a dedicated HTML sanitiser.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: raw($HTML, ...)
+      - pattern: $HTML.html_safe
+      - pattern: 'render(html: $HTML, ...)'
+      - pattern: 'render(inline: $HTML, ...)'
+
+  - id: ruby-path-traversal
+    languages: [ruby]
+    severity: ERROR
+    message: >-
+      A filesystem path is built from request/environment data. Resolve it with
+      `File.expand_path` and verify it stays inside the intended root.
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: File.read($PATH, ...)
+          - pattern: File.open($PATH, ...)
+          - pattern: File.new($PATH, ...)
+          - pattern: File.delete($PATH, ...)
+          - pattern: IO.read($PATH, ...)
+          - pattern: send_file($PATH, ...)
+          - pattern: FileUtils.cp($SRC, $DST, ...)
+      - pattern-not: File.read("...", ...)
+      - pattern-not: File.open("...", ...)
+      - pattern-not: File.new("...", ...)
+      - pattern-not: File.delete("...", ...)
+      - pattern-not: IO.read("...", ...)
+      - pattern-not: send_file("...", ...)
+      # Without dataflow, require the argument to look like request input.
+      # Test fixtures and build scripts read constants and local paths and are
+      # intentionally not reported.
+      - metavariable-regex:
+          metavariable: $PATH
+          regex: (?i)(params?|request|cookies?|argv|env\b|user_?input|upload)
+
+  - id: ruby-open-redirect
+    languages: [ruby]
+    severity: WARNING
+    message: >-
+      A redirect target comes from dynamic data. Validate it against an
+      allow-list of paths before redirecting.
+    metadata:
+      cwe: "CWE-601: URL Redirection to Untrusted Site"
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: redirect_to($URL, ...)
+          - pattern: redirect_to $URL
+      - pattern-not: redirect_to("...", ...)
+      - pattern-not: redirect_to "..."
+
+  - id: ruby-weak-hash
+    languages: [ruby]
+    severity: WARNING
+    message: >-
+      MD5/SHA-1 are unsuitable for security purposes. Use SHA-256+ for
+      integrity and bcrypt/argon2 for passwords.
+    metadata:
+      cwe: "CWE-328: Use of Weak Hash"
+      confidence: HIGH
+    pattern-either:
+      - pattern: Digest::MD5.$METHOD(...)
+      - pattern: Digest::SHA1.$METHOD(...)
+      - pattern: OpenSSL::Digest::MD5.new(...)
+      - pattern: OpenSSL::Digest::SHA1.new(...)
+      - pattern: OpenSSL::Digest.new("MD5", ...)
+      - pattern: OpenSSL::Digest.new("SHA1", ...)
+
+  - id: ruby-hardcoded-secret
+    languages: [ruby]
+    severity: WARNING
+    message: >-
+      A credential or API key appears to be hardcoded. Use environment
+      variables or a secret manager.
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      confidence: MEDIUM
+    pattern-regex: |-
+      (?i)(?:password|passwd|secret|api_?key|access_?key|token|private_?key)\s*=\s*["'][^"'#{}\s]{6,}["']
+
+  - id: ruby-erb-template-injection
+    languages: [ruby]
+    severity: WARNING
+    message: >-
+      An ERB template is built from dynamic data. Render only trusted templates
+      and pass user input as locals.
+    metadata:
+      cwe: "CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"
+      confidence: MEDIUM
+    patterns:
+      - pattern: ERB.new($TEMPLATE, ...)
+      - pattern-not: ERB.new("...", ...)
+
+  - id: ruby-erb-unescaped-output
+    languages: [generic]
+    paths:
+      include:
+        - "*.erb"
+    severity: ERROR
+    message: >-
+      An ERB template emits unescaped HTML (`raw` or `html_safe`). Use `<%= %>`
+      on already-escaped values or sanitise the input.
+    metadata:
+      cwe: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+      confidence: MEDIUM
+    pattern-regex: |-
+      <%=\s*(?:raw\s|.*\.html_safe\s*%>)

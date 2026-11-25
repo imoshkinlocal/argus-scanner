@@ -1,0 +1,19 @@
+{
+  "_readme": ["Pinned fixture for the argus SCA benchmark."],
+  "content-hash": "00000000000000000000000000000000",
+  "packages": [
+    {
+      "name": "phpmailer/phpmailer",
+      "version": "v5.2.17",
+      "type": "library"
+    }
+  ],
+  "packages-dev": [],
+  "aliases": [],
+  "minimum-stability": "stable",
+  "stability-flags": [],
+  "prefer-stable": false,
+  "prefer-lowest": false,
+  "platform": [],
+  "platform-dev": []
+}
