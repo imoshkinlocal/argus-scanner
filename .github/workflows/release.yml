@@ -35,12 +35,21 @@ jobs:
 
       - name: Install build tools
         run: |
+          set -eux
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             debhelper python3-pip python3-setuptools python3-wheel python3-venv
+          # Ubuntu 22.04 ships setuptools 59.6, which predates PEP 621 and
+          # would build an UNKNOWN-0.0.0 wheel.  debian/rules builds without
+          # isolation, so upgrade setuptools for the whole build.
+          sudo python3 -m pip install --upgrade 'setuptools>=68' wheel
 
       - name: Build the argus wheel
-        run: python3 -m pip wheel --no-deps --no-build-isolation -w wheelhouse .
+        run: |
+          set -eux
+          python3 -m pip wheel --no-deps --no-build-isolation -w wheelhouse .
+          ls -l wheelhouse
+          ls wheelhouse/argus_scanner-*.whl
 
       - name: Assemble the portable archive
         run: |
@@ -64,7 +73,8 @@ jobs:
                  "$B"/python/include "$B"/python/share/man
 
           # Install the runtime with the *bundled* interpreter: wheels must
-          # match its ABI (cp311), not the runner's Python.
+          # match its ABI (cp311), not the runner's Python.  The glob must stay
+          # unquoted so the shell expands it.
           "$B/python/bin/python3.11" -m pip install --no-cache-dir --no-compile \
             --target "$B/runtime" wheelhouse/argus_scanner-*.whl \
             "semgrep==$SEMGREP_VERSION"
