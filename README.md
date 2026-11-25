@@ -1126,3 +1126,7 @@ argus/
 ├── scripts/install.sh
 └── tests/
 ```
+
+## Лицензия
+
+MIT, см. [LICENSE](LICENSE).

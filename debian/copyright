@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: argus-scanner
-Source: https://example.invalid/argus
+Source: https://github.com/imoshkinlocal/argus-scanner
 
 Files: *
 Copyright: 2026 argus contributors
