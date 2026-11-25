@@ -100,14 +100,16 @@ jobs:
       - name: Build the universal .deb
         run: |
           set -eux
+          # dpkg-buildpackage writes the .deb to the parent of the source
+          # tree, one level above the checkout.  Move it next to the archive.
           dpkg-buildpackage -us -uc -b
           ls -l ../argus-scanner_*.deb
+          cp ../argus-scanner_*.deb staging/
 
       - name: Checksums
         run: |
           set -eux
           cd staging
-          cp ../argus-scanner_*.deb .
           sha256sum "argus-$VERSION-linux-x86_64.tar.gz" argus-scanner_*.deb > SHA256SUMS
           cat SHA256SUMS
 
