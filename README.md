@@ -130,7 +130,31 @@ remediation, сниппеты) → запись нового baseline → qualit
 
 ## Установка
 
-Требуется Python 3.9+.
+Требуется Python 3.10+.
+
+### Готовые сборки
+
+Портативный архив — скачал, распаковал, запустил. Внутри собственный
+CPython 3.11 и Semgrep, системный Python, pip, root и сеть не нужны
+(Linux x86_64, glibc 2.35+; Debian 12, Ubuntu 22.04, Astra 1.8 и новее):
+
+```bash
+tar xzf argus-1.1.0-linux-x86_64.tar.gz
+cd argus-1.1.0-linux-x86_64
+./argus version
+./argus scan /path/to/repo -f text
+```
+
+Debian/Astra — универсальный пакет (Architecture: all, при установке
+скачивает актуальный Semgrep с PyPI):
+
+```bash
+sudo apt install ./argus-scanner_1.1.0-3_all.deb
+```
+
+Ссылки на файлы — в разделе [Releases](../../releases/latest).
+
+### Из исходников
 
 ```bash
 git clone <repo> argus && cd argus
