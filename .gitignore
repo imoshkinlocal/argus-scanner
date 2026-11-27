@@ -21,6 +21,7 @@ debian/argus-scanner/
 debian/files
 debian/*.substvars
 debian/*.debhelper*
+debian/debhelper-build-stamp
 debian/tmp/
 
 # Editors and OS
