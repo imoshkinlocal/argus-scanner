@@ -42,6 +42,9 @@ rules:
       cwe: "CWE-295: Improper Certificate Validation"
       confidence: HIGH
     pattern: 'tls.Config{..., InsecureSkipVerify: true, ...}'
+    fix-regex:
+      regex: InsecureSkipVerify\s*:\s*true
+      replacement: "InsecureSkipVerify: false"
 
   - id: go-weak-hash
     languages: [go]

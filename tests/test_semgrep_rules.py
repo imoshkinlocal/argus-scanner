@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 
 import pytest
@@ -86,6 +87,46 @@ def test_list_rules_matches_files_on_disk():
     assert {rule["language"] for rule in listed} == set(LANGUAGES) - set(semgrep_engine.RULE_DIR_ALIASES)
     for rule in listed:
         assert rule["cwe"].startswith("CWE-"), rule
+
+
+def _field(block: str, name: str) -> str:
+    """Read a scalar top-level field from one rule block."""
+    for line in block.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{name}:"):
+            return stripped.split(":", 1)[1].strip()
+    return ""
+
+
+def test_fix_suggestions_are_well_formed():
+    """A fix is a proposal: it must be complete, valid and keep the severity.
+
+    The rules never opt into autofix, so the only correctness requirements are
+    that the replacement is usable as written and that the rule still declares
+    a severity the shared ladder can map.  A bare ``...`` in a replacement is
+    rejected because Semgrep writes it literally to the source.
+    """
+    fixed = 0
+    for _language, path in rule_files():
+        for block in parse_rules(path):
+            rule_id = _field(block, "id")
+            has_fix = bool(_field(block, "fix")) or "fix-regex:" in block
+            if not has_fix:
+                continue
+            fixed += 1
+            severity = _field(block, "severity")
+            assert severity in ALLOWED_SEVERITIES, f"{rule_id} has severity {severity}"
+            replacement = _field(block, "fix")
+            if replacement:
+                # ``$...ARGS`` is a metavariable, not an ellipsis literal.
+                remaining = re.sub(r"\$\.\.\.[A-Z_][A-Z0-9_]*", "", replacement)
+                assert "..." not in remaining, (
+                    f"{rule_id} has an ellipsis in its fix; it would be written "
+                    "to the source literally")
+            if "fix-regex:" in block:
+                assert "regex:" in block, f"{rule_id} has fix-regex without regex"
+                assert "replacement:" in block, f"{rule_id} has fix-regex without replacement"
+    assert fixed >= 5, "expected the bundle to carry suggested fixes"
 
 
 # --------------------------------------------------------------------------- semgrep integration

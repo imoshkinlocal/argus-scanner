@@ -67,6 +67,7 @@ rules:
       - pattern: yaml.load($DATA, ...)
       - pattern-not: yaml.load($DATA, Loader=yaml.SafeLoader, ...)
       - pattern-not: yaml.load($DATA, Loader=yaml.CSafeLoader, ...)
+    fix: yaml.safe_load($DATA)
 
   - id: python-sql-injection
     languages: [python]
@@ -126,6 +127,7 @@ rules:
       cwe: "CWE-295: Improper Certificate Validation"
       confidence: HIGH
     pattern: $CLIENT.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    fix: $CLIENT.set_missing_host_key_policy(paramiko.RejectPolicy())
 
   - id: python-jwt-no-verify
     languages: [python]
@@ -191,3 +193,6 @@ rules:
       cwe: "CWE-489: Active Debug Code"
       confidence: MEDIUM
     pattern: $APP.run(..., debug=True, ...)
+    fix-regex:
+      regex: debug\s*=\s*True
+      replacement: debug=False

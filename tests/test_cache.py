@@ -40,7 +40,7 @@ def test_cache_roundtrip(tmp_path):
         finding = Finding(rule_id="r", title="t", severity=Severity.HIGH,
                           kind="sast", engine="argus-java", file="A.java",
                           start_line=4, message="m", cwe="CWE-89",
-                          licenses=["MIT"])
+                          licenses=["MIT"], suggested_fix="safe();")
         cache.put("key", [finding])
         loaded = cache.get("key")
         assert loaded is not None
@@ -48,6 +48,7 @@ def test_cache_roundtrip(tmp_path):
         assert loaded[0].severity is Severity.HIGH
         assert loaded[0].start_line == 4
         assert loaded[0].licenses == ["MIT"]
+        assert loaded[0].suggested_fix == "safe();"
         assert cache.stats() == {"hits": 1, "misses": 1, "stored": 1}
 
 

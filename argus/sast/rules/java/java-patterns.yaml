@@ -56,6 +56,9 @@ rules:
       cwe: "CWE-614: Sensitive Cookie in HTTPS Session Without 'Secure' Attribute"
       confidence: HIGH
     pattern: $COOKIE.setSecure(false)
+    fix-regex:
+      regex: setSecure\(false\)
+      replacement: setSecure(true)
 
   - id: java-httponly-cookie
     languages: [java]
@@ -67,6 +70,9 @@ rules:
       cwe: "CWE-1004: Sensitive Cookie Without 'HttpOnly' Flag"
       confidence: HIGH
     pattern: $COOKIE.setHttpOnly(false)
+    fix-regex:
+      regex: setHttpOnly\(false\)
+      replacement: setHttpOnly(true)
 
   - id: java-deserialization
     languages: [java]

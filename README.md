@@ -488,6 +488,38 @@ C/C++: чтобы не засорять отчёт `memcpy`-шумом, `c-unsaf
 C++-эквивалент (`strcpy`, `system`, форматные строки), помечены `[c]` и не
 дублируются на `.cc/.cpp`.
 
+### Предлагаемые исправления
+
+Правила Semgrep могут нести `fix` (готовая замена) или `fix-regex`
+(регулярная замена внутри совпадения). argus переносит результат в
+`Finding.suggested_fix` и показывает его в JSON, SARIF, Markdown и текстовом
+отчёте, но **никогда не записывает в исходники**: отдельного autofix-флага нет,
+сканирование остаётся read-only.
+
+В бандле предложения есть у правил, где замена однозначна и не меняет
+семантику:
+
+| Правило | Что предлагается |
+| --- | --- |
+| `python-flask-debug` | `debug=True` → `debug=False` |
+| `python-yaml-load` | `yaml.load(...)` → `yaml.safe_load(...)` |
+| `python-paramiko-auto-add-policy` | `AutoAddPolicy` → `RejectPolicy` |
+| `java-insecure-cookie` | `setSecure(false)` → `setSecure(true)` |
+| `java-httponly-cookie` | `setHttpOnly(false)` → `setHttpOnly(true)` |
+| `go-tls-insecure-skip-verify` | `InsecureSkipVerify: true` → `false` |
+
+Если пишешь fix-правило:
+
+* заменяй только то, что действительно можно заменить: никаких «примерно так»;
+* не оставляй в `fix` эллипсис `...` — Semgrep подставит его буквально;
+  для аргументов есть `$...ARGS`, но пустой список раскрывается не всегда;
+* для переключателей флагов удобнее `fix-regex`: он меняет только литерал
+  внутри совпадения и сохраняет остальные аргументы;
+* severity правила не меняется: `suggested_fix` — дополнение к находке, а не
+  причина понизить или повысить уровень. Структуру проверяет
+  `tests/test_semgrep_rules.py::test_fix_suggestions_are_well_formed`, сквозной
+  сценарий — `tests/test_fix_suggestions.py`.
+
 ### Справочник CWE
 
 Встроенный каталог на 64 слабости: все CWE, которые выдают правила argus, плюс
@@ -674,6 +706,7 @@ Java-анализ кэшируется в SQLite по содержимому ф�
       "cwe_name": "Improper Neutralization of Special Elements used in an SQL Command",
       "message": "…",
       "remediation": ["Use a prepared statement."],
+      "suggested_fix": "app.run(debug=False)",
       "baseline": "new|existing",
       "suppressed": false,
       "suppression": {"reason": "…", "expires": "…"},
@@ -718,6 +751,7 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
   SCA-находок (advisory, CWE, EPSS, KEV, пакет, установленная/исправленная
   версия, манифест) с пометкой `new` относительно baseline;
 * секцию `Remediation` (команды обновления по экосистеме и советы),
+  `Suggested fixes` с готовыми заменами из правил (только предложения),
   `SAST context` со сниппетами и маркером строки, `Suppressed` (при
   `--include-suppressed`);
 * метрики инвентаря (direct/transitive/unknown), пропущенные зависимости,
@@ -731,6 +765,9 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
 * для SCA в `properties` добавляются `package`, `version`, `fixed_version`,
   `purl`, `epss`, `epss_percentile`, `kev`, `kev_ransomware`, `kev_due_date`;
 * CWE, `cwe_name`, `remediation` и `baselineState` доступны в `properties`;
+* если у правила есть `fix`, результат получает `fixes[]` с
+  `deletedRegion` и `insertedContent`: это предложение замены для code
+  scanning, а не применённое изменение;
 * подавленные находки получают `suppressions[{kind: "external", status:
   "accepted", justification}]`;
 * нефатальные ошибки попадают в `invocations[0].toolExecutionNotifications`.

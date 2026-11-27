@@ -479,6 +479,9 @@ def format_finding(finding: Dict[str, Any],
             number = start + offset
             marker = ">" if number == location.get("start_line") else " "
             lines.append(f"{marker} {number:>{width}} | {code_line}")
+    suggested_fix = str(finding.get("suggested_fix") or "").strip()
+    if suggested_fix:
+        lines.extend(["", "Предлагаемая замена (не применяется автоматически):", suggested_fix])
     remediation = finding.get("remediation") or []
     if remediation:
         lines.extend(["", "Как исправить:"])
@@ -1607,6 +1610,7 @@ class ArgusApp(tk.Tk):
                 package.get("name"), package.get("version"),
                 location.get("file"),
                 " ".join(finding.get("remediation") or ()),
+                finding.get("suggested_fix"),
             ) if item).lower()
             if not all(word in haystack for word in query.split()):
                 return False

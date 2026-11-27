@@ -132,6 +132,9 @@ class Finding:
     aliases: List[str] = dataclasses.field(default_factory=list)
     references: List[str] = dataclasses.field(default_factory=list)
     metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    #: Replacement proposed by the rule (Semgrep ``fix``).  It is a suggestion
+    #: for a human or a downstream tool; argus never writes it to the source.
+    suggested_fix: str = ""
 
     @property
     def location(self) -> str:
@@ -191,6 +194,8 @@ class Finding:
             payload["description"] = self.description
         if self.remediation:
             payload["remediation"] = list(self.remediation)
+        if self.suggested_fix:
+            payload["suggested_fix"] = self.suggested_fix
         if self.baseline:
             payload["baseline"] = self.baseline
         if self.suppressed:

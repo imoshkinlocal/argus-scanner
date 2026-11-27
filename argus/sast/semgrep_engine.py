@@ -131,6 +131,7 @@ def finding_from_result(result: dict, root: str, rule_meta: Optional[dict] = Non
         cwe=cwe,
         confidence=str(metadata.get("confidence") or "medium").lower(),
         references=[str(ref) for ref in references],
+        suggested_fix=str(extra.get("fix") or "").strip(),
         metadata={
             key: value
             for key, value in metadata.items()

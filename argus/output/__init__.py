@@ -27,7 +27,13 @@ def _visible(result: ScanResult) -> List[Finding]:
 
 
 def _finding_fix(finding: Finding) -> str:
-    """One-line remediation summary for compact tables."""
+    """One-line remediation summary for compact tables.
+
+    A rule's suggested replacement wins over the generic remediation hint: it
+    is concrete code, while the hint only names the class of the fix.
+    """
+    if finding.suggested_fix:
+        return " ".join(finding.suggested_fix.split())
     if not finding.remediation:
         return ""
     if finding.kind == "sca":
@@ -187,6 +193,30 @@ def sarif_report(result: ScanResult, root: str) -> Dict[str, Any]:
             sarif_result["properties"]["cwe_name"] = finding.cwe_name
         if finding.remediation:
             sarif_result["properties"]["remediation"] = list(finding.remediation)
+        if finding.suggested_fix and finding.start_line:
+            # SARIF "fixes" are a proposal, not an instruction: consumers such
+            # as GitHub code scanning show the replacement for review.
+            deleted: Dict[str, Any] = {"startLine": finding.start_line}
+            if finding.start_col:
+                deleted["startColumn"] = max(1, finding.start_col)
+            if finding.end_line:
+                deleted["endLine"] = max(finding.end_line, finding.start_line)
+            if (finding.end_col and finding.end_col > finding.start_col
+                    and finding.end_line == finding.start_line):
+                deleted["endColumn"] = finding.end_col
+            sarif_result["fixes"] = [{
+                "description": {"text": "Suggested replacement; review before applying."},
+                "artifactChanges": [{
+                    "artifactLocation": {
+                        "uri": finding.file or "",
+                        "uriBaseId": "%SRCROOT%",
+                    },
+                    "replacements": [{
+                        "deletedRegion": deleted,
+                        "insertedContent": {"text": finding.suggested_fix},
+                    }],
+                }],
+            }]
         if finding.kind == "sca":
             sarif_result["properties"].update(
                 {
@@ -289,6 +319,10 @@ def text_report(result: ScanResult, color: bool = False, max_items: int = 0) -> 
                 number = start + offset
                 arrow = ">" if number == finding.start_line else " "
                 lines.append(f"    {arrow} {number:>5} | {code_line}")
+        if finding.suggested_fix:
+            lines.append("    suggested fix (not applied):")
+            for fix_line in finding.suggested_fix.splitlines():
+                lines.append(f"      {fix_line}")
         if finding.remediation:
             lines.append(f"    fix: {finding.remediation[0]}")
         lines.append("")
@@ -470,7 +504,8 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
             )
         lines.append("")
 
-    fixes = [finding for finding in visible if finding.remediation]
+    fixes = [finding for finding in visible
+             if finding.remediation or finding.suggested_fix]
     if fixes:
         lines.extend([
             "## Remediation",
@@ -480,11 +515,35 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
         ])
         for finding in fixes[:60]:
             where = (finding.package or finding.location or "-")
-            fix = " <br> ".join(_md_cell(item) for item in finding.remediation[:2])
+            fix = _md_cell(_finding_fix(finding), 300)
             lines.append(f"| `{_md_cell(finding.rule_id)}` | {_md_cell(where)} | {fix} |")
         if len(fixes) > 60:
             lines.append(f"| ... | | {len(fixes) - 60} more findings with fixes |")
         lines.append("")
+
+    suggested = [finding for finding in visible if finding.suggested_fix]
+    if suggested:
+        lines.extend([
+            "## Suggested fixes",
+            "",
+            "These replacements are proposals from the rule set. argus never "
+            "modifies the scanned sources; apply them manually or with your "
+            "own autofix step after review.",
+            "",
+        ])
+        for finding in suggested[:20]:
+            lines.extend([
+                f"### `{_md_cell(finding.rule_id)}` — "
+                f"`{_md_cell(finding.location or '-')}`",
+                "",
+                "```text",
+                finding.suggested_fix,
+                "```",
+                "",
+            ])
+        if len(suggested) > 20:
+            lines.extend([f"*Suggested fixes shown for the first 20 of "
+                          f"{len(suggested)} findings.*", ""])
 
     snippets = [finding for finding in sast if finding.snippet]
     if snippets:
