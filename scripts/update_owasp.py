@@ -18,6 +18,12 @@ The official 2021 and 2025 pages contain a "List of Mapped CWEs" section.  The
 references, and its A09 page has no CWE list at all; for A09 we reuse the three
 successor CWEs from the 2021 A06 list (937, 1035, 1104).
 
+Editions are discovered automatically: every numeric directory from 2017 on
+that has ``docs/en`` pages is included.  A future edition therefore lands in
+the catalog after a plain ``python scripts/update_owasp.py``; add its Russian
+category names to ``RU_NAMES`` when they are known (the English names are used
+until then).
+
 Exit codes: 0 written/unchanged, 1 ``--check`` found a difference, 2 error.
 """
 
@@ -185,10 +191,49 @@ def _category(year: str, category_id: str, title: str, url: str,
     return {
         "id": category_id,
         "name": name,
-        "name_ru": RU_NAMES.get(f"{year}/{category_id}", ""),
+        # Fall back to the official English name until a translation exists.
+        "name_ru": RU_NAMES.get(f"{year}/{category_id}") or name,
         "url": url,
         "cwes": sorted({int(value) for value in cwes}),
     }
+
+
+def discover_years(repo_dir: Optional[str], ref: str) -> List[str]:
+    """Return the editions to regenerate, oldest first.
+
+    A new OWASP Top 10 year is picked up automatically once the official
+    repository contains ``<year>/docs/en`` (2017 keeps its own layout).
+    """
+    if repo_dir:
+        try:
+            names = os.listdir(repo_dir)
+        except OSError as exc:
+            raise UpdateError(f"cannot read {repo_dir}: {exc}") from exc
+        candidates = [name for name in names
+                      if re.fullmatch(r"\d{4}", name) and int(name) >= 2017
+                      and os.path.isdir(os.path.join(repo_dir, name))]
+        usable = []
+        for year in candidates:
+            layout = (os.path.join(repo_dir, year, "en") if year == "2017"
+                      else os.path.join(repo_dir, year, "docs", "en"))
+            if os.path.isdir(layout):
+                usable.append(year)
+    else:
+        api = f"https://api.github.com/repos/OWASP/Top10/contents?ref={ref}"
+        try:
+            entries = json.loads(_fetch(api))
+        except json.JSONDecodeError as exc:
+            raise UpdateError(f"cannot parse the GitHub response: {exc}") from exc
+        if not isinstance(entries, list):
+            raise UpdateError(f"unexpected GitHub response: {entries!r}")
+        usable = [str(item["name"]) for item in entries
+                  if item.get("type") == "dir"
+                  and re.fullmatch(r"\d{4}", str(item.get("name", "")))
+                  and int(item["name"]) >= 2017]
+    years = sorted(set(usable), key=int)
+    if not years:
+        raise UpdateError("no OWASP Top 10 editions found")
+    return years
 
 
 def collect(year: str, repo_dir: Optional[str], ref: str) -> List[Dict[str, object]]:
@@ -235,7 +280,7 @@ def collect(year: str, repo_dir: Optional[str], ref: str) -> List[Dict[str, obje
 
 def build(repo_dir: Optional[str], ref: str) -> Dict[str, object]:
     versions: Dict[str, object] = {}
-    for year in ("2017", "2021", "2025"):
+    for year in discover_years(repo_dir, ref):
         categories = collect(year, repo_dir, ref)
         if len(categories) != 10:
             raise UpdateError(f"expected 10 categories for {year}, got {len(categories)}")
@@ -247,6 +292,8 @@ def build(repo_dir: Optional[str], ref: str) -> Dict[str, object]:
     return {
         "schema": 1,
         "source": SOURCE,
+        # The bundled default stays on 2021 for reproducibility; reports can
+        # select any discovered edition with --owasp-version.
         "default": "2021",
         "versions": versions,
     }

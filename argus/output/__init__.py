@@ -318,7 +318,8 @@ def text_report(result: ScanResult, color: bool = False, max_items: int = 0) -> 
                         + (f" (fixed in {finding.fixed_version})" if finding.fixed_version else ""))
         lines.append(f"    at: {finding.location or '-'}")
         if finding.cwe:
-            label = f" ({finding.cwe_name})" if finding.cwe_name else ""
+            named = finding.cwe_name and finding.cwe_name != finding.cwe
+            label = f" ({finding.cwe_name})" if named else ""
             lines.append(f"    cwe: {finding.cwe}{label}")
         if finding.owasp:
             lines.append("    owasp: " + ", ".join(

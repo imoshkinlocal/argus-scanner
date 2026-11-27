@@ -1698,6 +1698,15 @@ class ArgusApp(tk.Tk):
         row("По severity", ", ".join(f"{name} {by_severity[name]}"
                                     for name in SEVERITY_ORDER if by_severity.get(name)) or "нет")
         row("По типу", f"SAST {by_kind.get('sast', 0)}  ·  SCA {by_kind.get('sca', 0)}")
+        by_owasp = summary.get("by_owasp") or {}
+        if by_owasp:
+            edition = summary.get("owasp_version") or ""
+            row("OWASP Top 10",
+                f"{edition}: " + "  ·  ".join(
+                    f"{label} ×{count}" for label, count in by_owasp.items()),
+                "accent")
+        else:
+            row("OWASP Top 10", "нет")
         graph_ready = bool(summary.get("dependency_graph"))
         row("Инвентарь",
             f"{summary.get('packages', 0)} пакетов  ·  "
