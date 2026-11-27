@@ -103,8 +103,9 @@ Map findings to the OWASP Top 10 edition \fB2017\fR, \fB2021\fR (default) or
 .TP
 .BR \-\-owasp\-file " " \fIFILE\fR
 Load a custom or updated CWE-to-OWASP mapping (JSON or TOML) instead of the
-bundled catalog.  A single-edition document is used as-is; a multi-edition
-document needs \fB\-\-owasp\-version\fR.
+bundled catalog.  A single-edition document is used as-is; for a multi-edition
+document \fB\-\-owasp\-version\fR selects the edition, defaulting to its
+\fBdefault\fR key when the flag is omitted.
 .TP
 .BR \-\-no\-owasp
 Do not map findings to the OWASP Top 10.
