@@ -3,6 +3,34 @@
 Все заметные изменения проекта. Формат — по мотивам Keep a Changelog,
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Добавлено
+
+- Экосистема `Debian` для SCA и SBOM: `debian/control` (build/runtime/
+  optional/dev-зависимости), dpkg status (`--deb-root`, `--deb-status`) и
+  отдельные `.deb` (`--deb`).
+- Парсер `debian/changelog` задаёт имя и версию проекта в SBOM; purl получает
+  `arch` и `distro` qualifiers (`pkg:deb/debian/openssl@…?arch=amd64&distro=bookworm`).
+- Компаратор версий dpkg: эпохи, `~`, ревизии Debian, `+deb12u1`.
+- OSV для Debian использует suite-экосистемы `Debian:<N>` (11/12/13/14);
+  suite определяется из `/etc/debian_version`, `os-release`, rootfs или
+  `debian/changelog`, переопределяется `--deb-suite`.
+- `tests/test_debian.py`: deb822, control, changelog, status, `.deb`,
+  dpkg-версии, purl, suite-детект и фильтрация OSV по релизу.
+
+### Изменено
+
+- Debian-зависимости без версии (`debian/control` и необязательные поля)
+  включаются как unversioned: версия в purl опускается, OSV-запрос не
+  выполняется.
+- `argus db update` по умолчанию не скачивает Debian-архив (~85 МБ); он
+  загружается явно через `--ecosystem Debian`.
+- При неизвестном suite Debian-пакеты пропускаются с предупреждением, чтобы не
+  подставлять fixed-версии из чужого релиза.
+- Offline-база OSV пропускает записи с `withdrawn` (их отфильтровывает и
+  online API), поэтому офлайн- и онлайн-результаты совпадают.
+
 ## [1.2.0] — 2026-11-27
 
 ### Добавлено

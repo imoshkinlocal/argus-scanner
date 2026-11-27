@@ -67,11 +67,27 @@ def _timestamp() -> str:
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _debian_identity(root: str) -> Dict[str, str]:
+    """Read ``debian/changelog`` to name the project for a source package."""
+    from .sca.debian import source_identity
+
+    return source_identity(root)
+
+
 def _project_name(root: str, options: SBOMOptions) -> str:
     if options.name:
         return options.name
+    identity = _debian_identity(root)
+    if identity.get("source"):
+        return identity["source"]
     name = os.path.basename(os.path.abspath(root).rstrip(os.sep))
     return name or "project"
+
+
+def _project_version(root: str, options: SBOMOptions) -> str:
+    if options.component_version:
+        return options.component_version
+    return _debian_identity(root).get("version", "")
 
 
 def _components(inventory: Inventory) -> List[Package]:
@@ -97,6 +113,15 @@ def _properties(package: Package) -> List[Dict[str, str]]:
     ]
     if package.depth is not None:
         properties.append({"name": "argus:depth", "value": str(package.depth)})
+    if package.arch:
+        properties.append({"name": "argus:deb-arch", "value": package.arch})
+    if package.distro:
+        properties.append({"name": "argus:deb-distro", "value": package.distro})
+    if package.source_name:
+        properties.append({"name": "argus:deb-source", "value": package.source_name})
+    if package.source_version:
+        properties.append({"name": "argus:deb-source-version",
+                           "value": package.source_version})
     return properties
 
 
@@ -178,9 +203,10 @@ def verify_document(document: Dict[str, Any], key: str = "") -> bool:
 def cyclonedx_document(root: str, inventory: Inventory, options: SBOMOptions) -> Dict[str, Any]:
     """Build a CycloneDX 1.5 JSON document from the inventory."""
     name = _project_name(root, options)
+    version = _project_version(root, options)
     project: Dict[str, Any] = {"type": "application", "name": name}
-    if options.component_version:
-        project["version"] = options.component_version
+    if version:
+        project["version"] = version
     components = _components(inventory)
     graph = inventory.graph
     dependencies = []
@@ -206,7 +232,7 @@ def cyclonedx_document(root: str, inventory: Inventory, options: SBOMOptions) ->
                 "type": "library",
                 "bom-ref": package.purl(),
                 "name": package.name,
-                "version": package.version,
+                **({"version": package.version} if package.version else {}),
                 "purl": package.purl(),
                 "scope": _scope(package),
                 **({"licenses": _cyclonedx_licenses(package)}
@@ -255,7 +281,7 @@ def spdx_document(root: str, inventory: Inventory, options: SBOMOptions) -> Dict
         entry: Dict[str, Any] = {
             "SPDXID": identifiers[package.key],
             "name": package.name,
-            "versionInfo": package.version,
+            **({"versionInfo": package.version} if package.version else {}),
             "downloadLocation": "NOASSERTION",
             "filesAnalyzed": False,
             "licenseConcluded": declared,
@@ -335,10 +361,12 @@ def markdown_inventory(root: str, inventory: Inventory, options: SBOMOptions) ->
     packages = _components(inventory)
     ecosystems: Dict[str, int] = {}
     assumed = 0
+    unversioned = 0
     licensed = 0
     for package in packages:
         ecosystems[package.ecosystem] = ecosystems.get(package.ecosystem, 0) + 1
         assumed += int(package.assumed)
+        unversioned += int(not package.version)
         licensed += int(bool(package.licenses))
     graph = inventory.graph
     lines: List[str] = [
@@ -355,6 +383,7 @@ def markdown_inventory(root: str, inventory: Inventory, options: SBOMOptions) ->
         f"* Ecosystems: "
         + (", ".join(f"{key}: {value}" for key, value in sorted(ecosystems.items())) or "-"),
         f"* Versions resolved from ranges (`assumed`): **{assumed}**",
+        f"* Unversioned components (no version in the manifest): **{unversioned}**",
         f"* Licences: components with a declared licence: "
         f"**{licensed} / {len(packages)}**",
         f"* Integrity: **SHA-256"
@@ -366,7 +395,12 @@ def markdown_inventory(root: str, inventory: Inventory, options: SBOMOptions) ->
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for package in packages:
-        source = "range lower bound" if package.assumed else "pinned"
+        if not package.version:
+            source = "unversioned"
+        elif package.assumed:
+            source = "range lower bound"
+        else:
+            source = "pinned"
         direct = "unknown" if package.direct is None else (
             "direct" if package.direct else "transitive")
         depth = "-" if package.depth is None else str(package.depth)
@@ -374,7 +408,8 @@ def markdown_inventory(root: str, inventory: Inventory, options: SBOMOptions) ->
         hashes = ", ".join(f"{algorithm}:{digest[:12]}…"
                            for algorithm, digest in package.hashes.items()) or "-"
         lines.append(
-            f"| {_cell(package.name)} | {_cell(package.version)} | {_cell(package.ecosystem)} | "
+            f"| {_cell(package.name)} | {_cell(package.version) or '—'} | "
+            f"{_cell(package.ecosystem)} | "
             f"{_cell(package.scope)} | {direct} | {depth} | {_cell(license_text)} | "
             f"{_cell(hashes)} | `{_cell(package.manifest)}` | "
             f"`{_cell(package.purl())}` | {source} |"

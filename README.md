@@ -90,7 +90,8 @@ SCA:
 * парсеры манифестов: `requirements.txt`, `pyproject.toml`, `poetry.lock`,
   `uv.lock`, `Pipfile(.lock)`, `package.json`, `package-lock.json`, `pom.xml`,
   Gradle, `go.mod`, `composer.json/lock`, `Gemfile`, `gems.rb`, `*.gemspec`,
-  `Gemfile.lock`, `Cargo.lock`;
+  `Gemfile.lock`, `Cargo.lock`, а также Debian: `debian/control`, база dpkg
+  (`--deb-root`/`--deb-status`) и отдельные `.deb` (`--deb`);
 * `argus/sca/graph.py` восстанавливает транзитивный граф только из
   lock-файлов, где уже зафиксировано разрешение версий: рёбра
   «родитель → потомок» дают `Gemfile.lock`, `package-lock.json` (v1/v2/v3),
@@ -211,6 +212,16 @@ argus sbom . -f spdx -o sbom.spdx.json              # SPDX 2.3
 argus sbom . -f md -o sbom.md                       # инвентарь для человека
 argus sbom . -o bom.json --sign-key "$KEY"           # SHA-256 + HMAC-SHA256
 argus sbom --verify bom.json --sign-key "$KEY"       # код 2 при неверной подписи
+```
+
+Debian: `debian/control`, база dpkg и отдельные `.deb`:
+
+```bash
+argus sbom . -f cyclonedx -o src.cdx.json              # debian/control + changelog
+argus sbom . --deb-root / -f cyclonedx -o host.cdx.json  # установленные пакеты
+argus sbom . --deb ./argus-scanner_1.2.0-1_all.deb \
+    --deb-suite bookworm -f md -o pkg.md               # один .deb
+argus sca . --deb-root / -f json -o host-vulns.json     # OSV для Debian
 ```
 
 Workflow для CI: один раз зафиксировать baseline, затем падать только на новом:
@@ -414,6 +425,10 @@ argus version          версии argus / Python / Semgrep
 | `--db-dir` | каталог архивов OSV |
 | `--no-cache` | не использовать кэш запросов OSV |
 | `--ecosystem` | ограничить экосистемы (можно повторять) |
+| `--deb-root` | читать установленные пакеты из `DIR/var/lib/dpkg/status` (`/` — текущая система) |
+| `--deb-status` | dpkg status-файл (можно повторять) |
+| `--deb` | бинарный `.deb` (можно повторять) |
+| `--deb-suite` | suite Debian (`bookworm`, `12`) для `--deb`/`--deb-status`/`debian/control` |
 | `--threat-intel` | добавить EPSS и CISA KEV к SCA-находкам |
 | `--epss-file` | локальный JSON EPSS вместо api.first.org |
 | `--kev-file` | локальный JSON каталога KEV |
@@ -434,6 +449,10 @@ argus version          версии argus / Python / Semgrep
 | `--range-policy` | `min` (по умолчанию) или `skip` |
 | `--exclude` | пропустить манифесты по glob (можно повторять) |
 | `--ecosystem` | ограничить экосистемы (можно повторять) |
+| `--deb-root` | читать `DIR/var/lib/dpkg/status` и определить suite из rootfs |
+| `--deb-status` | dpkg status-файл (можно повторять) |
+| `--deb` | бинарный `.deb` (можно повторять) |
+| `--deb-suite` | suite Debian для purl/OSV (`bookworm`, `12`); иначе — из rootfs/changelog |
 | `--sign-key` | HMAC-ключ для подписи (или `ARGUS_SBOM_KEY`) |
 | `--sign-key-id` | идентификатор ключа рядом с подписью |
 | `--verify FILE` | проверить подпись существующего SBOM и выйти |
@@ -831,6 +850,42 @@ SBOM (Software Bill of Materials) — машиночитаемый перече�
 в отчёте об уязвимостях не расходится. OSV при этом не вызывается: команда
 работает офлайн и экспортирует объявленные зависимости.
 
+### Debian: `debian/control`, dpkg и `.deb`
+
+У Debian нет lock-файла: объявленные зависимости лежат в `debian/control`, а
+разрешённые — в базе dpkg. argus понимает оба источника и отдельные `.deb`:
+
+* `debian/control` — `Build-Depends*` попадают в scope `build`, `Depends`/
+  `Pre-Depends` — в `runtime`, `Recommends`/`Suggests` — в `optional`/`dev`.
+  Альтернативы `a | b` дают первый вариант; arch-ограничения `[amd64]` и
+  profile-ограничения `<nocheck>` отбрасываются;
+* `debian/changelog` задаёт имя и версию проекта в SBOM, если не передан
+  `--name`/`--component-version`;
+* `--deb-root DIR` читает `DIR/var/lib/dpkg/status` (для текущей системы —
+  `--deb-root /`), `--deb-status FILE` — произвольный status-файл, `--deb FILE`
+  — метаданные одного бинарного пакета. В инвентарь попадают только
+  `Status: install ok installed`;
+* версии Debian (`[epoch:]upstream[-revision]`) сравниваются алгоритмом dpkg
+  (`~`, эпохи, `+deb12u1`), а не семвером;
+* purl: `pkg:deb/debian/<name>@<version>?arch=amd64&distro=bookworm`. Для
+  неверсионированных зависимостей версия опускается, а `distro` — это
+  codename suite.
+
+Для SCA критичен suite: OSV публикует Debian-советники как `Debian:11`,
+`Debian:12`, … и неверный suite даст чужие fixed-версии. argus определяет
+release из `/etc/debian_version`/`os-release` для `--deb-root` (и из
+`debian/changelog` для `debian/control`); для `--deb` и произвольного
+status-файла вне `<root>/var/lib/dpkg/status` нужен явный
+`--deb-suite bookworm` (или `12`). Без suite Debian-пакеты пропускаются с
+предупреждением в
+`errors`, а не проверяются наугад. Офлайн-база
+Debian большая (~85 МБ) и не входит в `argus db update` по умолчанию:
+
+```bash
+argus db update --ecosystem Debian
+argus sca . --deb-root / --offline -f json -o host-vulns.json
+```
+
 ### CycloneDX 1.5
 
 ```jsonc
@@ -1086,6 +1141,11 @@ precision 4/4 при ожидаемо низком recall вне категор�
   `NOASSERTION`. Транзитивные пакеты появляются только там, где lock-файл их
   перечисляет; для точных версий нужен lock-файл, иначе диапазон разрешается в
   нижнюю границу и помечается `assumed`.
+* Debian: `debian/control` не содержит установленных версий, поэтому такие
+  зависимости попадают в SBOM без версии (unversioned) и не проверяются в OSV;
+  точные версии даёт только dpkg-база или `.deb`. Без `--deb-suite` (и без
+  rootfs/changelog, из которых suite определяется) Debian-пакеты пропускаются:
+  советники OSV привязаны к конкретному релизу `Debian:<N>`.
 * EPSS/KEV — внешние фиды: их доступность и актуальность не гарантированы.
   При отсутствии сети используется кэш (возможно, устаревший), а причина
   попадает в `stats.threat_intel.errors`. Локальные `--epss-file`/`--kev-file`
@@ -1101,10 +1161,11 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
 Те же тесты идут в CI на Python 3.10–3.13, плюс end-to-end demo-скан:
 [workflow tests](../../actions/workflows/ci.yml).
 
-379 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
+421 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
 Spring MVC-параметры), секреты и IaC, версии и диапазоны OSV, парсеры
 манифестов (включая `Gemfile`/`*.gemspec` и извлечение лицензий/хэшей),
-дедупликация пакетов SCA, рёбра lock-файлов и BFS-глубины графа, фильтрация
+Debian (`debian/control`, dpkg status, `.deb`, dpkg-версии, suite и OSV
+`Debian:<N>`), дедупликация пакетов SCA, рёбра lock-файлов и BFS-глубины графа, фильтрация
 висячих рёбер, скоринг OWASP и SCA-бенчмарков, JSON/SARIF/Markdown/text-
 рендеринг и поля `summary`, генерация CycloneDX/SPDX SBOM (структура, purl,
 scope, `dependencies`/`DEPENDS_ON`, лицензии/хэши, подпись и `--verify`,
@@ -1150,6 +1211,7 @@ argus/
 │   │   └── java/              # tree-sitter taint-движок + каталог
 │   ├── sca/
 │   │   ├── parsers.py         # манифесты/lock -> Package + лицензии/хэши
+│   │   ├── debian.py          # debian/control, dpkg status, .deb, suite
 │   │   ├── graph.py           # транзитивный граф, direct/depth, дерево
 │   │   ├── versions.py        # сравнение версий, диапазоны OSV
 │   │   ├── osv.py             # OSV API / offline-архивы, кэш, --verify

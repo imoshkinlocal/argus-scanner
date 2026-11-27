@@ -9,7 +9,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from ..models import Finding, Severity, parse_severity
 from . import osv as osv_module
 from .graph import DependencyGraph, build_graph
-from .osv import LocalOSVDB, OSVClient, OSVError, VulnMatch, canonical_id, osv_name, vulnerability_cwes, vulnerability_severity
+from .osv import LocalOSVDB, OSVClient, OSVError, VulnMatch, canonical_id, osv_ecosystem, osv_name, vulnerability_cwes, vulnerability_severity
 from .parsers import LOCK_PARSERS, Package, SkippedDep, detect_parser, discover, parse_manifest
 
 
@@ -23,6 +23,14 @@ class SCAOptions:
     exclude: Sequence[str] = ()
     ecosystems: Sequence[str] = ()
     verbose: bool = False
+    #: Debian package roots whose ``var/lib/dpkg/status`` should be read.
+    deb_roots: Sequence[str] = ()
+    #: Explicit dpkg status files to read.
+    deb_status: Sequence[str] = ()
+    #: Binary ``.deb`` archives to inspect.
+    deb_files: Sequence[str] = ()
+    #: Debian suite/codename used for packages without a detectable rootfs.
+    deb_suite: str = ""
 
 
 def _dedupe_packages(packages: Iterable[Package]) -> Dict[Tuple[str, str, str], Package]:
@@ -30,7 +38,8 @@ def _dedupe_packages(packages: Iterable[Package]) -> Dict[Tuple[str, str, str], 
     # A lock file pins exact versions; manifest ranges resolved to their lower
     # bound are only an approximation.  When both describe the same package,
     # keep the pinned one instead of querying a version that may not be used.
-    pinned = {(p.ecosystem, p.name.lower()) for p in packages if not p.assumed}
+    pinned = {(p.ecosystem, p.name.lower()) for p in packages
+              if not p.assumed and p.version}
     unique: Dict[Tuple[str, str, str], Package] = {}
     order = {"runtime": 0, "build": 1, "optional": 2, "peer": 3, "dev": 4}
     for package in packages:
@@ -50,6 +59,14 @@ def _dedupe_packages(packages: Iterable[Package]) -> Dict[Tuple[str, str, str], 
             existing.direct = True
         elif existing.direct is None and package.direct is not None:
             existing.direct = package.direct
+        # Prefer the record that knows the Debian suite and source package.
+        if not existing.distro and package.distro:
+            existing.distro = package.distro
+        if not existing.source_name and package.source_name:
+            existing.source_name = package.source_name
+            existing.source_version = package.source_version
+        if not existing.arch and package.arch:
+            existing.arch = package.arch
     return unique
 
 
@@ -87,6 +104,31 @@ def collect_inventory(root: str, options: SCAOptions, progress=None) -> Inventor
         issues.extend(issue for issue in result.issues if issue)
         edges.extend(result.edges)
         parsed.append((rel, result))
+
+    if options.deb_roots or options.deb_status or options.deb_files:
+        from .debian import collect as collect_debian
+
+        debian = collect_debian(options.deb_roots, options.deb_status, options.deb_files,
+                                suite=options.deb_suite)
+        packages.extend(debian.packages)
+        skipped.extend(debian.skipped)
+        issues.extend(debian.issues)
+        edges.extend(debian.edges)
+        for manifest in debian.manifests:
+            if manifest not in manifests:
+                manifests.append(manifest)
+    else:
+        # An explicit suite (or the changelog target) also annotates packages
+        # parsed from debian/control.
+        from .debian import normalize_suite, source_identity
+
+        suite = normalize_suite(options.deb_suite)
+        if not suite.known:
+            suite = normalize_suite(source_identity(root).get("distribution", ""))
+        if suite.known:
+            for package in packages:
+                if package.ecosystem == "Debian" and not package.distro:
+                    package.distro = suite.label
 
     # A lock file may not record which packages are direct (poetry.lock,
     # uv.lock, composer.lock, Cargo.lock).  When a sibling manifest declares a
@@ -206,7 +248,7 @@ def scan(root: str, options: SCAOptions, progress=None) -> Tuple[List[Finding], 
     errors: List[str] = []
     stats: Dict[str, object] = {}
     inventory = collect_inventory(root, options, progress=progress)
-    if not inventory.manifests:
+    if not inventory.manifests and not inventory.packages:
         stats.update({"manifests_scanned": 0, "packages_total": 0, "packages_unique": 0,
                       "packages_direct": 0, "packages_transitive": 0, "packages_unknown": 0,
                       "dependency_graph": inventory.graph.as_dict(),
@@ -215,6 +257,18 @@ def scan(root: str, options: SCAOptions, progress=None) -> Tuple[List[Finding], 
 
     errors.extend(inventory.issues)
     unique = inventory.unique
+
+    unknown_suite = sorted({
+        package.name for package in unique.values()
+        if package.ecosystem == "Debian" and not osv_ecosystem(package)
+    })
+    if unknown_suite:
+        errors.append(
+            "Debian advisories need a release (OSV ecosystem Debian:<release>); "
+            "skipped " + ", ".join(unknown_suite[:10])
+            + ("…" if len(unknown_suite) > 10 else "")
+            + ". Pass --deb-suite (for example --deb-suite bookworm)"
+        )
 
     matches: List[VulnMatch] = []
     database_used = None
@@ -226,7 +280,8 @@ def scan(root: str, options: SCAOptions, progress=None) -> Tuple[List[Finding], 
             if missing:
                 errors.append(
                     "offline database is missing for: " + ", ".join(missing)
-                    + "; run `argus db update --ecosystems " + ",".join(missing) + "`"
+                    + "; run `argus db update "
+                    + " ".join(f"--ecosystem {name}" for name in missing) + "`"
                 )
             if len(missing) < len({p.ecosystem for p in unique.values()}):
                 matches.extend(database.query(list(unique.values())))

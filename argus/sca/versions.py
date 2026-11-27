@@ -81,8 +81,84 @@ def _is_post(token: str) -> bool:
     return token.lower() in _POST_RANK
 
 
+# --------------------------------------------------------------------------- Debian
+
+def _deb_split(version: str) -> Tuple[int, str, str]:
+    """Split ``[epoch:]upstream[-revision]`` using the Debian version rules."""
+    text = version.strip()
+    epoch = 0
+    head, separator, rest = text.partition(":")
+    if separator and head.isdigit():
+        epoch, text = int(head), rest
+    if "-" in text:
+        upstream, revision = text.rsplit("-", 1)
+    else:
+        upstream, revision = text, "0"
+    return epoch, upstream, revision
+
+
+def _deb_order(char: str) -> int:
+    """Character weight from Debian policy 5.6.12 (``~`` sorts before empty)."""
+    if char == "~":
+        return -1
+    if char.isdigit():
+        return 0
+    if char.isalpha() and char.isascii():
+        return ord(char)
+    if not char:
+        return 0
+    return ord(char) + 256
+
+
+def _deb_cmp_part(left: str, right: str) -> int:
+    """Compare one upstream/revision component the way dpkg does."""
+    i = j = 0
+    while i < len(left) or j < len(right):
+        # Non-digit runs: compare character by character, end of string is 0.
+        while ((i < len(left) and not left[i].isdigit())
+               or (j < len(right) and not right[j].isdigit())):
+            l_char = left[i] if i < len(left) and not left[i].isdigit() else ""
+            r_char = right[j] if j < len(right) and not right[j].isdigit() else ""
+            l_order, r_order = _deb_order(l_char), _deb_order(r_char)
+            if l_order != r_order:
+                return -1 if l_order < r_order else 1
+            if l_char:
+                i += 1
+            if r_char:
+                j += 1
+        # Digit runs: skip leading zeros, then compare length and value.
+        while i < len(left) and left[i] == "0":
+            i += 1
+        while j < len(right) and right[j] == "0":
+            j += 1
+        start_left, start_right = i, j
+        while i < len(left) and left[i].isdigit():
+            i += 1
+        while j < len(right) and right[j].isdigit():
+            j += 1
+        length_left, length_right = i - start_left, j - start_right
+        if length_left != length_right:
+            return -1 if length_left < length_right else 1
+        if left[start_left:i] != right[start_right:j]:
+            return -1 if left[start_left:i] < right[start_right:j] else 1
+    return 0
+
+
+def _deb_compare(left: str, right: str) -> int:
+    l_epoch, l_upstream, l_revision = _deb_split(left)
+    r_epoch, r_upstream, r_revision = _deb_split(right)
+    if l_epoch != r_epoch:
+        return -1 if l_epoch < r_epoch else 1
+    upstream = _deb_cmp_part(l_upstream, r_upstream)
+    if upstream:
+        return upstream
+    return _deb_cmp_part(l_revision, r_revision)
+
+
 def compare(left: str, right: str, ecosystem: str = "") -> int:
     """Return -1, 0 or 1 when ``left`` is older, equal or newer than ``right``."""
+    if str(ecosystem).lower() == "debian":
+        return _deb_compare(str(left), str(right))
     if left == right:
         return 0
     l_epoch, l_ver = _split_epoch(normalize(left))

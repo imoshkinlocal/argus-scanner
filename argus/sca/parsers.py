@@ -50,6 +50,7 @@ _PURL_TYPES = {
     "NuGet": "nuget",
     "ConanCenter": "conan",
     "Hex": "hex",
+    "Debian": "deb",
 }
 
 
@@ -73,6 +74,14 @@ class Package:
     licenses: List[str] = field(default_factory=list)
     #: Hex digests declared by the lock file, keyed by algorithm (``sha256``...).
     hashes: Dict[str, str] = field(default_factory=dict)
+    #: Debian package architecture (``all``, ``amd64``) when known.
+    arch: str = ""
+    #: Debian suite/codename (``bookworm``) when known.
+    distro: str = ""
+    #: Debian source package, when it differs from the binary package name.
+    source_name: str = ""
+    #: Version of the Debian source package.
+    source_version: str = ""
 
     @property
     def key(self) -> Tuple[str, str, str]:
@@ -86,9 +95,24 @@ class Package:
             name = f"{quote(group, safe='.')}/{quote(artifact, safe='')}"
         elif self.ecosystem == "npm" and name.startswith("@"):
             name = "%40" + name[1:].replace("/", "%2F")
+        elif self.ecosystem == "Debian":
+            # The purl namespace is the distribution; argus targets Debian-family
+            # systems and has no reliable way to detect a derivative here.
+            name = "debian/" + quote(name, safe="-._~")
         else:
             name = quote(name, safe="/-._~")
-        return f"pkg:{purl_type}/{name}@{quote(self.version, safe='.-_~+')}"
+        version_safe = ".-_~" if self.ecosystem == "Debian" else ".-_~+"
+        version = f"@{quote(self.version, safe=version_safe)}" if self.version else ""
+        qualifiers = ""
+        if self.ecosystem == "Debian":
+            pairs = []
+            if self.arch:
+                pairs.append("arch=" + quote(self.arch, safe=""))
+            if self.distro:
+                pairs.append("distro=" + quote(self.distro, safe=""))
+            if pairs:
+                qualifiers = "?" + "&".join(pairs)
+        return f"pkg:{purl_type}/{name}{version}{qualifiers}"
 
 
 @dataclass
@@ -159,6 +183,9 @@ def _is_requirements(name: str) -> bool:
 
 def detect_parser(relpath: str) -> Optional[str]:
     base = os.path.basename(relpath)
+    normalized = relpath.replace(os.sep, "/")
+    if normalized == "debian/control" or normalized.endswith("/debian/control"):
+        return "debian-control"
     if base in _MANIFEST_BASENAMES:
         return _MANIFEST_BASENAMES[base]
     if _is_requirements(relpath) and "node_modules" not in relpath:
@@ -1333,4 +1360,8 @@ def parse_manifest(root: str, rel: str, range_policy: str = "min") -> ParseResul
         return _parse_vcpkg(text, rel)
     if kind in ("nuget-packages", "nuget-project"):
         return _parse_nuget_packages(text, rel)
+    if kind == "debian-control":
+        from .debian import parse_control
+
+        return parse_control(text, rel, range_policy)
     return ParseResult(issues=[f"{rel}: unsupported manifest type"])

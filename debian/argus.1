@@ -104,6 +104,24 @@ Use the local OSV database instead of the network API.
 .BR \-\-db\-dir " " \fIDIR\fR
 Use an explicit directory for the offline OSV archives.
 .TP
+.BR \-\-deb\-root " " \fIDIR\fR
+Read installed packages from \fIDIR\fR/var/lib/dpkg/status (use \fB/\fR for
+the running system).  The Debian release is detected from that rootfs.
+.TP
+.BR \-\-deb\-status " " \fIFILE\fR
+Read a dpkg status file; may be repeated.  A file below
+\fIroot\fR/var/lib/dpkg/status also picks up the suite from \fIroot\fR.
+.TP
+.BR \-\-deb " " \fIFILE\fR
+Inspect a binary .deb package; may be repeated.
+.TP
+.BR \-\-deb\-suite " " \fISUITE\fR
+Debian suite or codename (for example \fBbookworm\fR or \fB12\fR) used for
+purl \fIdistro\fR qualifiers and OSV \fIDebian:<release>\fR advisories.
+Required for \fB\-\-deb\fR and standalone status files when the release cannot
+be detected.  Download that offline archive with
+\fBargus db update \-\-ecosystem Debian\fR.
+.TP
 .BR \-\-no\-sast ", " \-\-no\-sca
 Disable one half of a combined scan.
 .TP

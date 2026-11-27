@@ -34,6 +34,13 @@ QUERY_TTL_SECONDS = 12 * 60 * 60
 
 SUPPORTED_ECOSYSTEMS = [
     "Maven", "PyPI", "npm", "Go", "Packagist", "RubyGems",
+    "crates.io", "NuGet", "ConanCenter", "Debian",
+]
+
+#: Ecosystems downloaded by default.  Debian is large (~85 MB) and only needed
+#: for Debian package inventories, so it stays opt-in: ``argus db update --ecosystem Debian``.
+DEFAULT_DB_ECOSYSTEMS = [
+    "Maven", "PyPI", "npm", "Go", "Packagist", "RubyGems",
     "crates.io", "NuGet", "ConanCenter",
 ]
 
@@ -67,7 +74,36 @@ def osv_name(package: Package) -> str:
     """Return the package name exactly as OSV expects it."""
     if package.ecosystem == "PyPI":
         return package.name.lower().replace("_", "-").replace(".", "-")
+    if package.ecosystem == "Debian" and package.source_name:
+        # OSV publishes Debian advisories under source package names.
+        return package.source_name
     return package.name
+
+
+def osv_version(package: Package) -> str:
+    """Return the version OSV ranges refer to (the source version for Debian)."""
+    if package.ecosystem == "Debian" and package.source_version:
+        return package.source_version
+    return package.version
+
+
+def osv_ecosystem(package: Package) -> str:
+    """Return the OSV ecosystem used for queries.
+
+    OSV publishes Debian advisories per release (``Debian:12``); without a known
+    suite there is no safe way to match them, so the result is empty and the
+    caller must skip the package instead of guessing.
+    """
+    if package.ecosystem == "Debian":
+        from .debian import debian_ecosystem
+
+        return debian_ecosystem(package.distro)
+    return package.ecosystem
+
+
+def osv_archive(package: Package) -> str:
+    """Return the offline archive name; Debian ships all suites in one file."""
+    return "Debian" if package.ecosystem == "Debian" else package.ecosystem
 
 
 def _gzip_bytes(payload: bytes) -> bytes:
@@ -235,8 +271,25 @@ class OSVClient:
 
     def query(self, packages: Sequence[Package]) -> List[VulnMatch]:
         unique: Dict[Tuple[str, str, str], Package] = {}
+        skipped = 0
+        skipped_suite = 0
         for package in packages:
-            unique.setdefault((package.ecosystem, osv_name(package), package.version), package)
+            ecosystem = osv_ecosystem(package)
+            if package.ecosystem == "Debian" and not ecosystem:
+                # A Debian advisory is tied to one release; without the suite a
+                # query would return versions from other releases (false fixes).
+                skipped_suite += 1
+                continue
+            version = osv_version(package)
+            if not version:
+                # Debian dependencies without a known version cannot be matched.
+                skipped += 1
+                continue
+            unique.setdefault((ecosystem, osv_name(package), version), package)
+        if skipped:
+            self._log(f"[osv] skipped {skipped} package(s) without a version")
+        if skipped_suite:
+            self._log(f"[osv] skipped {skipped_suite} Debian package(s) without a suite")
         if not unique:
             return []
 
@@ -314,18 +367,22 @@ def build_matches(unique: Dict[Tuple[str, str, str], Package],
         package = unique.get(key)
         if package is None:
             continue
+        ecosystem = osv_ecosystem(package)
+        if not ecosystem:
+            continue
         for vuln_id in ids:
             document = details.get(vuln_id)
-            if not document:
+            if not document or document.get("withdrawn"):
                 continue
             fixed = ""
             for affected in document.get("affected") or []:
                 affected_package = affected.get("package") or {}
-                if affected_package.get("ecosystem") != package.ecosystem:
+                if affected_package.get("ecosystem") != ecosystem:
                     continue
                 if affected_package.get("name") not in (package.name, osv_name(package)):
                     continue
-                candidate = version_utils.fixed_version_for(package.version, affected, package.ecosystem)
+                candidate = version_utils.fixed_version_for(
+                    osv_version(package), affected, package.ecosystem)
                 if candidate and (not fixed or version_utils.compare(candidate, fixed, package.ecosystem) < 0):
                     fixed = candidate
             matches.append(VulnMatch(package=package, vuln=document, fixed_version=fixed))
@@ -440,13 +497,26 @@ class LocalOSVDB:
                         document = json.loads(archive.read(name))
                     except (json.JSONDecodeError, KeyError):
                         continue
+                    if document.get("withdrawn"):
+                        # Withdrawn records stay in the archive but must not be
+                        # reported (the online API filters them out too).
+                        continue
+                    names = set()
                     for affected in document.get("affected") or []:
                         affected_package = affected.get("package") or {}
-                        if affected_package.get("ecosystem") != ecosystem:
+                        affected_ecosystem = str(affected_package.get("ecosystem") or "")
+                        if ecosystem == "Debian":
+                            # One archive holds Debian:11, Debian:12, ...; the
+                            # suite is selected later, per package.
+                            if not affected_ecosystem.startswith("Debian:"):
+                                continue
+                        elif affected_ecosystem != ecosystem:
                             continue
                         package_name = affected_package.get("name")
                         if package_name:
-                            index.setdefault(package_name, []).append(document)
+                            names.add(package_name)
+                    for package_name in names:
+                        index.setdefault(package_name, []).append(document)
         except (zipfile.BadZipFile, OSError) as exc:
             if self.verbose:
                 print(f"[osv] cannot read {path}: {exc}", file=sys.stderr)
@@ -456,27 +526,35 @@ class LocalOSVDB:
     def query(self, packages: Sequence[Package]) -> List[VulnMatch]:
         matches: List[VulnMatch] = []
         for package in packages:
-            index = self._load(package.ecosystem)
-            for document in index.get(package.name, []):
+            version = osv_version(package)
+            if not version:
+                continue
+            ecosystem = osv_ecosystem(package)
+            if not ecosystem:
+                continue
+            name = osv_name(package)
+            index = self._load(osv_archive(package))
+            for document in index.get(name, []):
                 fixed = ""
                 hit = False
                 for affected in document.get("affected") or []:
                     affected_package = affected.get("package") or {}
-                    if affected_package.get("ecosystem") != package.ecosystem:
+                    if affected_package.get("ecosystem") != ecosystem:
                         continue
-                    if affected_package.get("name") != package.name:
+                    if affected_package.get("name") != name:
                         continue
                     versions = affected.get("versions") or []
-                    if package.version in versions:
+                    if version in versions:
                         hit = True
                     for entry in affected.get("ranges") or []:
                         if entry.get("type") not in ("ECOSYSTEM", "SEMVER"):
                             continue
                         inclusive = any("last_affected" in event for event in entry.get("events") or [])
-                        if version_utils.range_contains(package.version, entry.get("events") or [],
+                        if version_utils.range_contains(version, entry.get("events") or [],
                                                        package.ecosystem, inclusive):
                             hit = True
-                    candidate = version_utils.fixed_version_for(package.version, affected, package.ecosystem)
+                    candidate = version_utils.fixed_version_for(version, affected,
+                                                                package.ecosystem)
                     if candidate and (not fixed or version_utils.compare(candidate, fixed, package.ecosystem) < 0):
                         fixed = candidate
                 if hit:

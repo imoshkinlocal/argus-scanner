@@ -105,6 +105,20 @@ def _add_sast_arguments(parser: argparse.ArgumentParser) -> None:
                         help="directory for the incremental SAST cache")
 
 
+def _add_debian_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--deb-root", action="append", default=[], metavar="DIR",
+                        help="read installed packages from DIR/var/lib/dpkg/status "
+                             "(repeatable; use / for the running system)")
+    parser.add_argument("--deb-status", action="append", default=[], metavar="FILE",
+                        help="read a dpkg status file (repeatable)")
+    parser.add_argument("--deb", action="append", default=[], metavar="FILE",
+                        help="inspect a binary .deb package (repeatable)")
+    parser.add_argument("--deb-suite", default="", metavar="SUITE",
+                        help="Debian suite/codename (for example bookworm or 12) for "
+                             "--deb/--deb-status and debian/control; "
+                             "default: detect from the rootfs or the host")
+
+
 def _add_sca_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--include-dev", action="store_true", help="include dev/test dependencies")
     parser.add_argument("--range-policy", default="min", choices=("min", "skip"),
@@ -115,6 +129,7 @@ def _add_sca_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--db-dir", metavar="DIR", help="offline OSV archive directory")
     parser.add_argument("--ecosystem", action="append", default=[], metavar="NAME",
                         help="restrict to an ecosystem (repeatable)")
+    _add_debian_arguments(parser)
     parser.add_argument("--threat-intel", action="store_true",
                         help="annotate SCA findings with EPSS scores and CISA KEV status")
     parser.add_argument("--epss-file", metavar="FILE",
@@ -265,6 +280,10 @@ def _sca_options(args: argparse.Namespace) -> SCAOptions:
         ecosystems=tuple(args.ecosystem),
         exclude=tuple(getattr(args, "exclude", ())),
         verbose=not args.quiet,
+        deb_roots=tuple(getattr(args, "deb_root", ()) or ()),
+        deb_status=tuple(getattr(args, "deb_status", ()) or ()),
+        deb_files=tuple(getattr(args, "deb", ()) or ()),
+        deb_suite=getattr(args, "deb_suite", "") or "",
     )
 
 
@@ -356,6 +375,10 @@ def command_sbom(args: argparse.Namespace) -> int:
         exclude=tuple(args.exclude),
         ecosystems=tuple(args.ecosystem),
         verbose=False,
+        deb_roots=tuple(args.deb_root or ()),
+        deb_status=tuple(args.deb_status or ()),
+        deb_files=tuple(args.deb or ()),
+        deb_suite=getattr(args, "deb_suite", "") or "",
     )
     inventory = collect_inventory(root, options)
     metadata = SBOMOptions(
@@ -441,10 +464,10 @@ def command_bench_sca(args: argparse.Namespace) -> int:
 
 
 def command_db_update(args: argparse.Namespace) -> int:
-    from .sca.osv import DB_ECOSYSTEMS, LocalOSVDB
+    from .sca.osv import DEFAULT_DB_ECOSYSTEMS, LocalOSVDB
 
     database = LocalOSVDB(args.db_dir, verbose=not args.quiet)
-    ecosystems = args.ecosystem or list(DB_ECOSYSTEMS)
+    ecosystems = args.ecosystem or list(DEFAULT_DB_ECOSYSTEMS)
     results = database.update(ecosystems)
     failed = 0
     for ecosystem, size, error in results:
@@ -705,6 +728,7 @@ def build_parser() -> argparse.ArgumentParser:
                       help="skip manifests whose path matches this glob (repeatable)")
     sbom.add_argument("--ecosystem", action="append", default=[], metavar="NAME",
                       help="restrict to an ecosystem (repeatable)")
+    _add_debian_arguments(sbom)
     sbom.add_argument("-q", "--quiet", action="store_true", help="suppress progress messages")
     sbom.add_argument("--config", metavar="PATH",
                       help="project configuration (argus.toml / argus.json)")
