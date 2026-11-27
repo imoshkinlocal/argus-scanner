@@ -25,6 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 semgrep = ["semgrep>=1.60"]
+gui = ["PySide6>=6.6"]
 dev = ["pytest>=7", "semgrep>=1.60"]
 
 [project.scripts]

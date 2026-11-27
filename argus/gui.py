@@ -1481,7 +1481,19 @@ class ArgusApp(tk.Tk):
         self._set_text(self.details, format_finding(finding, self.dep_paths.get(purl)))
 
 
-def main() -> int:
+def _qt_available() -> bool:
+    try:
+        import PySide6  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--tk" not in args and _qt_available():
+        from . import gui_qt
+        return gui_qt.main(["argus-gui"] + [a for a in args if a != "--qt"])
     try:
         app = ArgusApp()
     except tk.TclError as exc:
