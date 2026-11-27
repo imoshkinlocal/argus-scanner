@@ -93,6 +93,8 @@ def _field(block: str, name: str) -> str:
     """Read a scalar top-level field from one rule block."""
     for line in block.splitlines():
         stripped = line.strip()
+        if stripped.startswith("- "):
+            stripped = stripped[2:]
         if stripped.startswith(f"{name}:"):
             return stripped.split(":", 1)[1].strip()
     return ""
