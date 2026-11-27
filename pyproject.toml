@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-scanner"
-version = "1.1.0"
+version = "1.2.0"
 description = "SAST + SCA scanner: Java dataflow engine, Semgrep rule packs and OSV dependency checks"
 readme = "README.md"
 requires-python = ">=3.10"

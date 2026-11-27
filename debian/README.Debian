@@ -51,7 +51,7 @@ On a machine with network access, prepare wheels for the target platform
 
 Then either pass the directory to the package manager:
 
-  sudo ARGUS_WHEELHOUSE=/media/wheels apt install ./argus-scanner_1.1.0-3_amd64.deb
+  sudo ARGUS_WHEELHOUSE=/media/wheels apt install ./argus-scanner_1.2.0-1_all.deb
 
 or write the directory into the first line of /etc/argus-scanner/wheelhouse
 and install normally.  The runtime can also be rebuilt afterwards:
@@ -76,7 +76,7 @@ Do not install Semgrep with the system interpreter:
 
   pip install semgrep          # fails: externally-managed-environment
 
-Debian and Astra mark the system Python as externally managed.  The runtime
+Debian marks the system Python as externally managed.  The runtime
 is a virtual environment, where pip skips that check, so
 argus-setup-runtime is not affected.
 
@@ -95,4 +95,4 @@ SCA uses api.osv.dev by default.  For offline use:
 The database is stored in ~/.cache/argus/osv-db and can be copied between
 machines.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>
+ -- Ivan Moshkin <ilevanov1900@gmail.com>

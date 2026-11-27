@@ -132,20 +132,20 @@ remediation, сниппеты) → запись нового baseline → qualit
 
 Портативный архив: распакуйте и запустите. Внутри CPython 3.11 и Semgrep,
 поэтому системный Python, pip, root и сеть не нужны. Нужны Linux x86_64 и
-glibc 2.35+ (Debian 12, Ubuntu 22.04, Astra 1.8 и новее):
+glibc 2.35+ (Debian 12, Ubuntu 22.04 и новее):
 
 ```bash
-tar xzf argus-1.1.0-linux-x86_64.tar.gz
-cd argus-1.1.0-linux-x86_64
+tar xzf argus-1.2.0-linux-x86_64.tar.gz
+cd argus-1.2.0-linux-x86_64
 ./argus version
 ./argus scan /path/to/repo -f text
 ```
 
-Для Debian и Astra есть универсальный пакет: Architecture: all, Semgrep
+Для Debian и производных есть универсальный пакет: Architecture: all, Semgrep
 ставится с PyPI при установке.
 
 ```bash
-sudo apt install ./argus-scanner_1.1.0-4_all.deb
+sudo apt install ./argus-scanner_1.2.0-1_all.deb
 ```
 
 Ссылки на файлы — в разделе [Releases](../../releases/latest).
@@ -648,7 +648,7 @@ Java-анализ кэшируется в SQLite по содержимому ф�
   "$schema": "https://json.schemastore.org/argus-report-1.1.json",
   "schema_version": "1.1",
   "generated_at": "2026-11-18T09:00:00Z",
-  "tool": {"name": "argus", "version": "1.1.0", "engines": ["argus-java", "osv"]},
+  "tool": {"name": "argus", "version": "1.2.0", "engines": ["argus-java", "osv"]},
   "target": "/abs/path",
   "summary": {
     "total": 2,
@@ -841,7 +841,7 @@ SBOM (Software Bill of Materials) — машиночитаемый перече�
   "version": 1,
   "metadata": {
     "timestamp": "…",
-    "tools": [{"vendor": "argus", "name": "argus", "version": "1.1.0"}],
+    "tools": [{"vendor": "argus", "name": "argus", "version": "1.2.0"}],
     "component": {"type": "application", "name": "my-project"}
   },
   "components": [

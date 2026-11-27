@@ -43,4 +43,4 @@ What the package installs
 Rebuilding for another platform is not necessary: the wheel is pure Python
 and the dependencies are resolved on the target machine.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>
+ -- Ivan Moshkin <ilevanov1900@gmail.com>

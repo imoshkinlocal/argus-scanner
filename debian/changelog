@@ -1,3 +1,15 @@
+argus-scanner (1.2.0-1) unstable; urgency=medium
+
+  * Surface Semgrep fixes as suggested replacements in JSON
+    (`suggested_fix`), SARIF (`fixes[]`), Markdown, text and the GUI.
+  * Add review-only fixes to the Flask debug, YAML load, Paramiko host-key,
+    cookie flags and Go TLS rules; nothing is written to the sources.
+  * Keep the reported severity unchanged when a fix is present and cover the
+    rule structure and end-to-end behaviour with tests.
+  * Bump the version so the portable archive, wheel and Debian package agree.
+
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Fri, 27 Nov 2026 12:00:00 +0300
+
 argus-scanner (1.1.0-4) unstable; urgency=medium
 
   * Use tomli for TOML configuration files on Python 3.10 (tomllib exists
@@ -5,7 +17,7 @@ argus-scanner (1.1.0-4) unstable; urgency=medium
     the minimum supported interpreter.
   * Declare tomli as a conditional dependency in pyproject.toml.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>  Thu, 26 Nov 2026 10:00:00 +0300
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Thu, 26 Nov 2026 10:00:00 +0300
 
 argus-scanner (1.1.0-3) unstable; urgency=medium
 
@@ -23,7 +35,7 @@ argus-scanner (1.1.0-3) unstable; urgency=medium
     package no longer contains third-party binaries.
   * Remove the pip-managed Semgrep environment used by 1.1.0-2 on upgrade.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 20:00:00 +0300
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Wed, 25 Nov 2026 20:00:00 +0300
 
 argus-scanner (1.1.0-2) unstable; urgency=medium
 
@@ -36,13 +48,13 @@ argus-scanner (1.1.0-2) unstable; urgency=medium
   * Depend on python3-venv for the isolated Semgrep environment.
   * Remove the pip-managed environment on purge.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 19:00:00 +0300
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Wed, 25 Nov 2026 19:00:00 +0300
 
 argus-scanner (1.1.0-1) unstable; urgency=medium
 
   * Initial Debian package.
   * Bundle the Python dependency closure in a private runtime because
     python3-tree-sitter, python3-tree-sitter-java and Semgrep are not
-    available in the Astra/Debian archive.
+    available in the Debian archive.
 
- -- Ivan Moshkin <imoshkin@astralinux.ru>  Wed, 25 Nov 2026 18:00:00 +0300
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Wed, 25 Nov 2026 18:00:00 +0300

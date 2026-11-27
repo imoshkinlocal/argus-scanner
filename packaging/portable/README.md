@@ -1,4 +1,4 @@
-argus 1.1.0 — портативный архив для Linux
+argus 1.2.0 — портативный архив для Linux
 =========================================
 
 Скачал, распаковал, запустил — ничего устанавливать не нужно.
@@ -8,28 +8,28 @@ argus 1.1.0 — портативный архив для Linux
 Требования
 ----------
   * Linux x86_64 (amd64);
-  * glibc 2.35 или новее: Debian 12+, Ubuntu 22.04+, Astra Linux 1.8+,
-    ALT 10+, ROSA 2021+;
+  * glibc 2.35 или новее: Debian 12+, Ubuntu 22.04+, ALT 10+,
+    ROSA 2021+;
   * всё остальное — в архиве. Сеть нужна только для SCA-запросов к OSV
     (можно выключить) и для обновления Semgrep.
 
 Быстрый старт
 -------------
-  tar xzf argus-1.1.0-linux-x86_64.tar.gz
-  cd argus-1.1.0-linux-x86_64
+  tar xzf argus-1.2.0-linux-x86_64.tar.gz
+  cd argus-1.2.0-linux-x86_64
 
   ./argus version
-  # argus 1.1.0
+  # argus 1.2.0
   # python 3.11.18
   # semgrep .../runtime/bin/semgrep
 
   cd /path/to/repo
-  /path/to/argus-1.1.0-linux-x86_64/argus scan . -f text
+  /path/to/argus-1.2.0-linux-x86_64/argus scan . -f text
 
 Чтобы звать просто `argus`, положите ссылку в ~/.local/bin:
 
   mkdir -p ~/.local/bin
-  ln -sf /path/to/argus-1.1.0-linux-x86_64/argus ~/.local/bin/argus
+  ln -sf /path/to/argus-1.2.0-linux-x86_64/argus ~/.local/bin/argus
 
 Отчёты и код возврата
 ---------------------
@@ -70,7 +70,7 @@ libXrender). CLI работает без них.
 
 Удаление
 --------
-  rm -rf argus-1.1.0-linux-x86_64        # больше ничего не создаётся
+  rm -rf argus-1.2.0-linux-x86_64        # больше ничего не создаётся
 
 Что внутри
 ----------
@@ -92,6 +92,6 @@ libXrender). CLI работает без них.
 
 Другие способы установки
 ------------------------
-  * Debian/Astra: argus-scanner_1.1.0-4_all.deb (системная установка,
+  * Debian: argus-scanner_1.2.0-1_all.deb (системная установка,
     semgrep скачивается при установке);
   * офлайн .deb 58 МБ: только amd64 + Python 3.11 (legacy 1.1.0-2).

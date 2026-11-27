@@ -1,4 +1,4 @@
 # Ubuntu's dpkg-deb defaults to zstd, which dpkg releases before 1.21.18
-# (Astra 1.8) cannot read.  debian/rules pins xz on purpose, so the tag is
+# cannot read.  debian/rules pins xz on purpose, so the tag is
 # not applicable here.
 custom-compression-in-debian-rules

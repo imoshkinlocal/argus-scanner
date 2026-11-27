@@ -3,6 +3,32 @@
 Все заметные изменения проекта. Формат — по мотивам Keep a Changelog,
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.2.0] — 2026-11-27
+
+### Добавлено
+
+- Semgrep-правила могут нести `fix` или `fix-regex`; argus показывает замену
+  как `suggested_fix` в JSON, SARIF (`fixes[]`), Markdown, текстовом отчёте
+  и GUI.
+- Предложения замен для `python-flask-debug`, `python-yaml-load`,
+  `python-paramiko-auto-add-policy`, `java-insecure-cookie`,
+  `java-httponly-cookie` и `go-tls-insecure-skip-verify`.
+- `tests/test_fix_suggestions.py` — сквозная проверка предложений и
+  read-only поведения; структурная проверка fix-правил в
+  `tests/test_semgrep_rules.py`.
+
+### Изменено
+
+- `Finding` получил поле `suggested_fix`; JSON-отчёт и кэш SAST переносят его
+  без потерь.
+- Markdown-отчёт: секция `Suggested fixes` и приоритет готовой замены в
+  таблице `Remediation`.
+
+### Безопасность
+
+- `fix` никогда не применяется автоматически: сканирование остаётся
+  read-only, отдельного autofix-флага нет.
+
 ## [1.1.0] — 2026-11-26
 
 ### Добавлено
@@ -48,4 +74,5 @@
 - `argus-scanner_1.1.0-3` — универсальный пакет без вендоринга.
 - `argus-scanner_1.1.0-4` — исправление TOML на Python 3.10 (`tomli`).
 
+[1.2.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.2.0
 [1.1.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.1.0

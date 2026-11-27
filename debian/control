@@ -1,7 +1,7 @@
 Source: argus-scanner
 Section: utils
 Priority: optional
-Maintainer: Ivan Moshkin <imoshkin@astralinux.ru>
+Maintainer: Ivan Moshkin <ilevanov1900@gmail.com>
 Build-Depends:
  debhelper-compat (= 13),
  python3,
