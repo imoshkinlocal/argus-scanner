@@ -1109,6 +1109,11 @@ class ArgusWindow(QMainWindow):
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")
+            or os.environ.get("QT_QPA_PLATFORM")):
+        print("argus-gui: cannot open a display (set DISPLAY or WAYLAND_DISPLAY)",
+              file=sys.stderr)
+        return 2
     app = QApplication.instance() or QApplication(sys.argv if argv is None else argv)
     app.setStyleSheet(STYLESHEET)
     window = ArgusWindow()

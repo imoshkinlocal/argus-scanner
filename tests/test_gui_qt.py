@@ -60,6 +60,13 @@ def test_backend_selection_prefers_qt(monkeypatch):
     assert "qt" in called
 
 
+def test_qt_main_reports_missing_display(monkeypatch, capsys):
+    for name in ("DISPLAY", "WAYLAND_DISPLAY", "QT_QPA_PLATFORM"):
+        monkeypatch.delenv(name, raising=False)
+    assert gui_qt.main([]) == 2
+    assert "cannot open a display" in capsys.readouterr().err
+
+
 def test_tk_flag_forces_tk(monkeypatch):
     monkeypatch.setattr(gui, "_qt_available", lambda: True)
     monkeypatch.setattr(gui, "ArgusApp", lambda: type("A", (), {"mainloop": lambda s: None})())

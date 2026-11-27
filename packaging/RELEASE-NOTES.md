@@ -57,10 +57,10 @@ CycloneDX/SPDX SBOM, OpenVEX.
 Артефакты
 ---------
   argus-1.5.0-linux-x86_64.tar.gz          ~121 МБ  портативный архив
-  argus-scanner_1.5.0-1_all.deb            ~250 КБ  универсальный .deb
+  argus-scanner_1.5.0-1_all.deb            ~300 КБ  универсальный .deb
   argus-scanner_1.5.0-1.dsc                        source package
-  argus-scanner_1.5.0.orig.tar.gz          ~280 КБ  исходники
-  argus-scanner_1.5.0-1.debian.tar.xz       ~12 КБ  debian/
+  argus-scanner_1.5.0.orig.tar.gz          ~440 КБ  исходники
+  argus-scanner_1.5.0-1.debian.tar.xz       ~13 КБ  debian/
   SHA256SUMS                                       контрольные суммы
 
 Проверка
