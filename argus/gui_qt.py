@@ -19,11 +19,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-    QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSplitter, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QTextBrowser, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QFrame, QGridLayout,
+    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit,
+    QProgressBar, QPushButton, QScrollArea, QSplitter, QStackedWidget, QTableWidget,
+    QTableWidgetItem, QTextBrowser, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from . import __version__, cwe as cwe_catalog
@@ -218,10 +217,14 @@ class ArgusWindow(QMainWindow):
     # --------------------------------------------------------------- scan page
 
     def _build_scan_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(18, 16, 18, 16)
         layout.setSpacing(12)
+        page = QScrollArea()
+        page.setWidgetResizable(True)
+        page.setFrameShape(QFrame.NoFrame)
+        page.setWidget(content)
 
         source, source_layout = _card("1 · Каталог с исходниками")
         row = QHBoxLayout()
@@ -236,23 +239,23 @@ class ArgusWindow(QMainWindow):
         layout.addWidget(source)
 
         options, options_layout = _card("2 · Что проверять и как")
-        toggles = QHBoxLayout()
+        toggles = QGridLayout()
         self.sast_check = QCheckBox("SAST — анализ кода")
         self.sast_check.setChecked(True)
         self.sca_check = QCheckBox("SCA — уязвимые зависимости (OSV)")
         self.sca_check.setChecked(True)
-        self.dev_check = QCheckBox("dev/test-зависимости")
-        self.offline_check = QCheckBox("Офлайн: только локальная база OSV")
         self.secrets_check = QCheckBox("Секреты")
         self.secrets_check.setChecked(True)
         self.iac_check = QCheckBox("IaC (Docker/K8s/Terraform)")
         self.iac_check.setChecked(True)
         self.owasp_check = QCheckBox("OWASP Top 10")
         self.owasp_check.setChecked(True)
-        for widget in (self.sast_check, self.sca_check, self.secrets_check, self.iac_check,
-                       self.owasp_check, self.dev_check, self.offline_check):
-            toggles.addWidget(widget)
-        toggles.addStretch(1)
+        self.dev_check = QCheckBox("dev/test-зависимости")
+        self.offline_check = QCheckBox("Офлайн: только локальная база OSV")
+        for index, widget in enumerate((self.sast_check, self.sca_check, self.secrets_check,
+                                        self.iac_check, self.owasp_check, self.dev_check,
+                                        self.offline_check)):
+            toggles.addWidget(widget, index // 4, index % 4)
         options_layout.addLayout(toggles)
 
         form = QFormLayout()
@@ -335,9 +338,10 @@ class ArgusWindow(QMainWindow):
         self.log_view = QPlainTextEdit()
         self.log_view.setObjectName("log")
         self.log_view.setReadOnly(True)
-        self.log_view.setMinimumHeight(140)
+        self.log_view.setMinimumHeight(200)
         log_layout.addWidget(self.log_view)
-        layout.addWidget(log_card, 1)
+        layout.addWidget(log_card)
+        layout.addStretch(1)
         return page
 
     def _with_picker(self, edit: QLineEdit, title: str) -> QWidget:
@@ -486,8 +490,12 @@ class ArgusWindow(QMainWindow):
             "depth — неизвестна."))
         self.deps_tree = QTreeWidget()
         self.deps_tree.setHeaderLabels(["Пакет"] + [DEP_HEADINGS[c] for c in DEP_COLUMNS])
-        self.deps_tree.setAlternatingRowColors(False)
-        self.deps_tree.header().setStretchLastSection(True)
+        header = self.deps_tree.header()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        self.deps_tree.setColumnWidth(0, 360)
+        for column, width in enumerate((130, 120, 100, 80), start=1):
+            self.deps_tree.setColumnWidth(column, width)
         layout.addWidget(self.deps_tree, 1)
         return page
 
@@ -516,7 +524,13 @@ class ArgusWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
         self.cwe_list = QTreeWidget()
         self.cwe_list.setHeaderLabels(["CWE", "Уязвимость", "Категория", "В отчёте"])
-        self.cwe_list.header().setStretchLastSection(False)
+        cwe_header = self.cwe_list.header()
+        cwe_header.setStretchLastSection(False)
+        cwe_header.setSectionResizeMode(QHeaderView.Interactive)
+        cwe_header.setSectionResizeMode(1, QHeaderView.Stretch)
+        self.cwe_list.setColumnWidth(0, 90)
+        self.cwe_list.setColumnWidth(2, 200)
+        self.cwe_list.setColumnWidth(3, 80)
         self.cwe_list.setRootIsDecorated(False)
         self.cwe_list.itemSelectionChanged.connect(self._show_cwe_details)
         self.cwe_list.itemDoubleClicked.connect(lambda _item, _c: self._open_cwe_link())
