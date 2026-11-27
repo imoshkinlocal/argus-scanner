@@ -307,6 +307,253 @@ Summary: critical: 0, high: 2, medium: 0, low: 0, info: 0, total: 2
 отчёты этого прогона лежат в `examples/report.{txt,json,sarif}`. CI запускает
 тот же сценарий на каждый push, вместе с тестами на Python 3.10–3.13.
 
+## Пример вывода сканера
+
+Ниже — полный текстовый отчёт на демо-проекте `examples/owasp-demo` из 5 файлов: Java-код с SQL-инъекцией,
+Python-код с command injection и слабым MD5, `Dockerfile` с `USER root`, `pom.xml`
+с уязвимой `log4j-core 2.14.1`. Команда:
+
+```bash
+argus scan examples/owasp-demo -f text
+```
+
+Для более простого примера с двумя SAST-находками см. `examples/vulnerable` и
+`examples/report.txt`.
+
+```
+CRITICAL           CVE-2021-44228
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.15.0)
+    at: pom.xml
+    cwe: CWE-20 (Improper Input Validation)
+    owasp: A03:2021 Injection
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-jfh8-c2jp-5v3q; fixed in 2.15.0
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.15.0
+
+CRITICAL           CVE-2021-45046
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.16.0)
+    at: pom.xml
+    cwe: CWE-502 (Deserialization of Untrusted Data)
+    owasp: A08:2021 Software and Data Integrity Failures
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-7rjr-3q55-vv33; fixed in 2.16.0
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.16.0
+
+HIGH               java-sqli-jdbc
+    at: Vulnerable.java:7
+    cwe: CWE-89 (Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection'))
+    owasp: A03:2021 Injection
+    Untrusted data reaches `st.executeQuery("SELECT * FROM users WHERE id = " + id)`. Data originates from request.getParameter.
+          5 |         String id = request.getParameter("id");
+          6 |         java.sql.Statement st = null;
+    >     7 |         st.executeQuery("SELECT * FROM users WHERE id = " + id);
+          8 |     }
+          9 | }
+    fix: Use a prepared statement with bound parameters instead of string concatenation.
+
+HIGH               python-command-injection
+    at: app.py:6
+    cwe: CWE-78 (Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection'))
+    owasp: A03:2021 Injection
+    A shell command is built from a string. Use `subprocess.run` with an argument list and `shell=False`, and validate every argument.
+          4 | 
+          5 | def run(cmd):
+    >     6 |     return subprocess.call(cmd, shell=True)
+          7 | 
+          8 | 
+    fix: Pass an argument list to ProcessBuilder and never invoke a shell.
+
+HIGH               CVE-2021-45105
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.17.0)
+    at: pom.xml
+    cwe: CWE-20 (Improper Input Validation)
+    owasp: A03:2021 Injection
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-p6xc-xr62-6r2g; fixed in 2.17.0
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.17.0
+
+MEDIUM             iac-docker-root-user
+    at: Dockerfile:2
+    cwe: CWE-250 (Execution with Unnecessary Privileges)
+    User directive selects the root account; use an unprivileged user.
+          1 | FROM ubuntu:22.04
+    >     2 | USER root
+          3 | RUN echo "hello"
+    fix: Run the container as a non-root user with a read-only root filesystem.
+
+MEDIUM             python-weak-hash
+    at: app.py:10
+    cwe: CWE-328 (Use of Weak Hash)
+    owasp: A02:2021 Cryptographic Failures
+    MD5/SHA-1 are unsuitable for security purposes. Use SHA-256+ or a password hashing function.
+          8 | 
+          9 | def digest(value):
+    >    10 |     return hashlib.md5(value.encode()).hexdigest()
+    fix: Для паролей используйте Argon2id, bcrypt или scrypt.
+
+MEDIUM             CVE-2021-44832
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.17.1)
+    at: pom.xml
+    cwe: CWE-20 (Improper Input Validation)
+    owasp: A03:2021 Injection
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-8489-44mv-ggj8; fixed in 2.17.1
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.17.1
+
+MEDIUM             CVE-2025-68161
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.25.3)
+    at: pom.xml
+    cwe: CWE-297
+    owasp: A07:2021 Identification and Authentication Failures
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-vc5p-v9hr-52mj; fixed in 2.25.3
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.25.3
+
+MEDIUM             CVE-2026-34477
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.25.4)
+    at: pom.xml
+    cwe: CWE-297
+    owasp: A07:2021 Identification and Authentication Failures
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-6hg6-v5c8-fphq; fixed in 2.25.4
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.25.4
+
+MEDIUM             CVE-2026-34479
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.25.4)
+    at: pom.xml
+    cwe: CWE-116 (Improper Encoding or Escaping of Output)
+    owasp: A03:2021 Injection
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-h383-gmxw-35v2; fixed in 2.25.4
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.25.4
+
+MEDIUM             CVE-2026-34480
+    package: org.apache.logging.log4j:log4j-core 2.14.1 (fixed in 2.25.4)
+    at: pom.xml
+    cwe: CWE-116 (Improper Encoding or Escaping of Output)
+    owasp: A03:2021 Injection
+    org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-3pxv-7cmr-fjr4; fixed in 2.25.4
+    fix: mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.25.4
+
+Dependency tree:
+org.apache.logging.log4j:log4j-core 2.14.1  [direct]  [critical]
+
+Summary: critical: 2, high: 3, medium: 7, low: 0, info: 0, total: 12
+OWASP Top 10 2021: A02:2021 ×1, A03:2021 ×7, A07:2021 ×2, A08:2021 ×1
+```
+
+### Как читать вывод
+
+**Заголовок находки** — уровень серьёзности и идентификатор правила. Для SAST
+это ID правила (`java-sqli-jdbc`), для SCA — CVE-идентификатор из OSV (или GHSA,
+если CVE нет), для IaC и секретов — ID правила из встроенного набора.
+
+**Строки `package`, `at`, `cwe`, `owasp`, `fix`:**
+
+- `package` (только SCA) — координаты, версия из манифеста и первая версия, где
+  уязвимость исправлена (`fixed in`). Версия берётся из OSV-записи, а не из
+  текста совета.
+- `at` — файл и строка. Для SCA это манифест (`pom.xml`), а не место вызова:
+  argus не строит граф вызовов и не знает, вызывается ли уязвимая функция.
+- `cwe` — CWE из правила или OSV-записи. Название берётся из локального
+  справочника (`argus cwe`). Если CWE в справочнике нет, выводится только ID.
+- `owasp` — категория OWASP Top 10 редакции 2021, которая содержит этот CWE
+  (см. раздел [OWASP Top 10](#owasp-top-10)).
+- `fix` — рекомендация из правила или OSV. Для SCA это команда обновления
+  зависимости; для SAST — текст правила.
+
+**Фрагмент кода** (SAST и IaC) — три строки вокруг места срабатывания. Строка с
+маркером `>` — та, на которой сработало правило. Для SAST-находок от
+`argus-java` код берётся из файла; для Semgrep-правил — из фрагмента, который
+вернул движок.
+
+**Строка `Dependency tree`** — корневые зависимости. Здесь видно, что
+`log4j-core` прямая (`[direct]`), поэтому её можно обновить напрямую.
+
+**Строка `Summary`** — подсчёт по уровням серьёзности, итог `total` совпадает с
+числом находок в блоке выше. По умолчанию не показываются подавленные находки
+(см. [Подавления](#подавления)), поэтому `suppressed` не выводится.
+
+**Строка `OWASP Top 10 2021`** — распределение по категориям. Считается по всем
+находкам, у которых есть CWE и есть совпадение в каталоге редакции. Находки без
+совпадения в этой строке не учитываются.
+
+### Откуда берутся находки
+
+| Тип | Движок | Что ищется | Как |
+| --- | --- | --- | --- |
+| SAST, Java | `argus-java` (tree-sitter) | потоки данных от источников (`request.getParameter`) к стокам (`executeQuery`, `Runtime.exec`) | taint-анализ внутри файла: присваивания, конкатенация, коллекции; санитайзеры (ESAPI и парсеры чисел) сбрасывают taint |
+| SAST, Python/JS/Go/PHP/C/C++ | `semgrep` + встроенные правила | паттерны API (`subprocess`, `hashlib.md5`, …) | правила в `argus/sast/rules/*.yaml`, сопоставление по AST |
+| SCA | `osv` | зависимости из манифестов (`pom.xml`, `requirements.txt`, `package-lock.json`, …) | версии приводятся к диапазонам из OSV, запрос батчем к `api.osv.dev/v1/querybatch` (или офлайн-архив `--offline`) |
+| Секреты | `argus-secrets` | ключи провайдеров (AWS, GitHub, Slack, …) и обобщённые присваивания `password = "…"` | регулярные выражения провайдеров; для обобщённого правила значение должно пройти фильтр: длина ≥ 8, не плейсхолдер, энтропия Шеннона ≥ 3.5 бит/символ |
+| IaC | `argus-iac` | Dockerfile, Kubernetes-манифесты, Terraform | встроенные правила (например, `iac-docker-root-user`) |
+
+### Дедупликация, сортировка и порог
+
+1. **Дедупликация.** Ключ SAST/IaC — `(kind, rule_id, file, line)`; ключ SCA —
+   `(kind, rule_id, package, version)`. Если два движка нашли одно и то же,
+   остаётся экземпляр с большей уверенностью (`low` < `medium` < `high`).
+2. **Сортировка** — по убыванию серьёзности, затем по `kind` (строки сравниваются
+   по алфавиту, поэтому `sast` идёт раньше `sca`), файлу, строке, `rule_id` и пакету.
+3. **Порог (gate).** `--fail-on` (по умолчанию `high`) сравнивает серьёзность
+   с порогом. Если есть находка с серьёзностью не ниже порога, процесс завершается
+   кодом `1`. Если порог не сработал, но движки вернули ошибки, код будет `2`.
+   Строка `gate:` выводит число таких находок и лимит.
+
+### Тот же результат в JSON
+
+Полные поля находки (фрагмент сокращён, `description` и `remediation` обрезаны):
+
+```json
+{
+  "id": "c8e202eee73c6f1a7bee234e9c6d6d73",
+  "kind": "sca",
+  "engine": "osv",
+  "rule_id": "CVE-2021-44228",
+  "title": "Remote code injection in Log4j",
+  "severity": "critical",
+  "confidence": "high",
+  "message": "org.apache.logging.log4j:log4j-core 2.14.1 is affected by GHSA-jfh8-c2jp-5v3q; fixed in 2.15.0",
+  "cwe": "CWE-20",
+  "location": {"file": "pom.xml", "start_line": 0, "start_column": 0, "end_line": 0, "end_column": 0},
+  "cwe_name": "Improper Input Validation",
+  "cwe_name_ru": "Некорректная проверка входных данных",
+  "owasp": [
+    {
+      "id": "A03:2021",
+      "version": "2021",
+      "name": "Injection",
+      "name_ru": "Инъекции",
+      "url": "https://owasp.org/Top10/A03_2021-Injection/"
+    }
+  ],
+  "description": "# Summary\n\nLog4j versions prior to 2.16.0 are subject to …",
+  "remediation": ["mvn versions:use-dep-version -Dincludes=org.apache.logging.log4j:log4j-core -DdepVersion=2.15.0"]
+}
+```
+
+Сводка (`summary`) для того же прогона:
+
+```json
+{
+  "total": 12,
+  "suppressed": 0,
+  "by_severity": {"critical": 2, "high": 3, "medium": 7, "low": 0, "info": 0, "unknown": 0},
+  "by_kind": {"sast": 4, "sca": 8},
+  "by_engine": {"osv": 8, "argus-java": 1, "semgrep": 2, "argus-iac": 1},
+  "by_owasp": {"A02:2021": 1, "A03:2021": 7, "A07:2021": 2, "A08:2021": 1},
+  "owasp_version": "2021",
+  "packages": 1,
+  "max_severity": "critical",
+  "status": "findings"
+}
+```
+
+Полный JSON, Markdown и SARIF описаны в разделе [Форматы отчётов](#форматы-отчётов).
+
+### Карточка OWASP Top 10 в GUI
+
+На скриншоте — вкладка «Результаты» после сканирования того же демо-проекта.
+Сверху — сводка с строкой «OWASP Top 10» (распределение по категориям). Таблица
+показывает колонку OWASP для каждой находки. Справа — карточка выбранной
+находки: CWE, категория OWASP с названием и ссылкой на официальную страницу,
+фрагмент кода и рекомендация.
+
+![GUI: сводка, OWASP Top 10 и карточка находки](docs/images/gui-owasp.png)
+
 ## GUI
 
 Графический интерфейс на `tkinter` (стандартная библиотека, отдельных
