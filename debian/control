@@ -20,6 +20,25 @@ Depends:
  python3-venv,
 Recommends:
  python3-tk,
+ libegl1,
+ libfontconfig1,
+ libgl1,
+ libglib2.0-0,
+ libwayland-client0,
+ libwayland-cursor0,
+ libx11-6,
+ libx11-xcb1,
+ libxcb1,
+ libxcb-cursor0,
+ libxcb-icccm4,
+ libxcb-image0,
+ libxcb-keysyms1,
+ libxcb-randr0,
+ libxcb-render-util0,
+ libxcb-shape0,
+ libxcb-xkb1,
+ libxkbcommon0,
+ libxkbcommon-x11-0,
 Description: SAST and SCA security scanner
  argus scans source code and dependency manifests for security issues.
  It combines a built-in Java dataflow engine, Semgrep rule packs for
@@ -30,6 +49,9 @@ Description: SAST and SCA security scanner
  Reports are available as JSON, SARIF, Markdown, text, CycloneDX/SPDX
  SBOM and OpenVEX. Baseline files, suppressions, quality gates and
  EPSS/KEV enrichment support use in CI pipelines.
+ .
+ The desktop GUI uses Qt (PySide6, installed into the private runtime) and
+ falls back to Tk when Qt is not available.
  .
  The package is architecture independent.  On installation it creates a
  private Python environment in /var/lib/argus-scanner/runtime and

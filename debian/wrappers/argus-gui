@@ -1,5 +1,6 @@
 #!/bin/sh
-# Debian launcher for the Tk front-end.
+# Debian launcher for the desktop front-end: Qt when PySide6 is present in
+# the private runtime, Tk otherwise (argus-gui --tk also forces Tk).
 set -e
 VENV=/var/lib/argus-scanner/runtime
 

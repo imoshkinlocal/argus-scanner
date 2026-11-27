@@ -1,20 +1,42 @@
-.TH ARGUS-GUI 1 "2026-11-27" "argus 1.4.0" "User Commands"
+.TH ARGUS-GUI 1 "2026-11-27" "argus 1.5.0" "User Commands"
 .SH NAME
 argus-gui \- desktop front-end for the argus security scanner
 .SH SYNOPSIS
 .B argus-gui
+.RB [ \-\-tk ]
 .SH DESCRIPTION
 .B argus-gui
-starts the Tk front-end shipped with
+starts the desktop front-end shipped with
 .BR argus (1).
 It can start a scan, browse findings, filter and sort results, inspect
 dependency trees and compare two JSON reports.
 .PP
-The GUI requires tkinter and a working display.  Install
-.B python3-tk
-and make sure \fBDISPLAY\fR or \fBWAYLAND_DISPLAY\fR is set.
+The window is built with Qt (PySide6).  When
+.B PySide6
+is not installed for the current interpreter, the Tk front-end is used
+instead, so the command keeps working on systems without Qt.
+The Debian package installs PySide6 into its private runtime
+.I /var/lib/argus-scanner/runtime
+during installation.
+.SH OPTIONS
+.TP
+.B \-\-tk
+Force the Tk front-end even when Qt is available.
+.SH ENVIRONMENT
+.TP
+.B DISPLAY
+X11 display used by both front-ends.
+.TP
+.B WAYLAND_DISPLAY
+Wayland display; Qt selects the Wayland platform when available.
+.TP
+.B QT_QPA_PLATFORM
+Qt platform plugin, for example
+.I offscreen
+for automated screenshots.
 .SH SEE ALSO
 .BR argus (1),
+.BR argus-setup-runtime (1),
 .I /usr/share/doc/argus-scanner/README.md
 .SH AUTHOR
 argus contributors.

@@ -1,4 +1,4 @@
-argus 1.4.0
+argus 1.5.0
 ===========
 
 Сканер кода и зависимостей: SAST (Java dataflow, Semgrep-правила для
@@ -9,76 +9,75 @@ CycloneDX/SPDX SBOM, OpenVEX.
 Что нового
 ----------
 
-* Каждая находка с CWE сопоставляется с OWASP Top 10. Встроены редакции
-  **2017**, **2021** (по умолчанию) и **2025**; один CWE может относиться к
-  нескольким категориям (CWE-259 → A02:2021 и A07:2021).
-* Флаги `--owasp-version`, `--owasp-file` и `--no-owasp` для `scan`, `sast` и
-  `sca`; настройки `owasp`, `owasp_version`, `owasp_file` в конфиге.
-* Новая команда `argus owasp [CWE...]`: список категорий редакции или маппинг
-  конкретных CWE, форматы text/Markdown/JSON.
-* Справочник живёт в `argus/owasp_top10.json` и обновляется скриптом
-  `scripts/update_owasp.py` из официального `OWASP/Top10` — без пересборки
-  кода. Свой файл (JSON/TOML) подключается через `--owasp-file`.
-* OWASP есть во всех представлениях: JSON (`finding.owasp`,
-  `summary.by_owasp`, `summary.owasp_version`), text, Markdown (колонка и
-  распределение), SARIF (теги `owasp/aNN-YYYY` и properties) и GUI (опции
-  сканирования, детали находки, сводка).
-* GUI: переключатель OWASP, выбор редакции и своего файла в окне сканирования.
+* Новый GUI на Qt (PySide6): боковая навигация, таблица находок с фильтрами
+  и группировкой, цветные счётчики severity, карточка выбранной находки,
+  сводка с распределением OWASP Top 10, вкладки зависимостей, справочника
+  CWE и справки.
+* `argus-gui` по умолчанию открывает Qt-окно. Флаг `--tk` включает прежний
+  Tk-интерфейс; он же используется автоматически, если PySide6 недоступен.
+* `.deb` ставит `PySide6-Essentials` в приватный runtime, поэтому Qt
+  открывается без системного `python3-pyside6`. При обновлении с 1.4.0
+  `postinst` добавляет Qt в существующий runtime, не пересобирая его.
+* `argus-setup-runtime --upgrade-gui` добавляет или обновляет Qt, `--no-gui`
+  пропускает его, `--list` показывает версию GUI.
+* Логика интерфейса вынесена в `argus/gui_core.py` без зависимости от
+  тулкита: Qt- и Tk-окна показывают одни и те же данные.
+* Для установки из исходников: `pip install 'argus-scanner[gui]'`.
 
 Что скачать
 -----------
 
-1. Рекомендуется: argus-1.4.0-linux-x86_64.tar.gz
+1. Рекомендуется: argus-1.5.0-linux-x86_64.tar.gz
    Портативный архив. Внутри свой Python 3.11 и Semgrep 1.187.0.
    Распаковал — запустил. Без root, без pip, без сети, без установки.
 
-     tar xzf argus-1.4.0-linux-x86_64.tar.gz
-     cd argus-1.4.0-linux-x86_64
+     tar xzf argus-1.5.0-linux-x86_64.tar.gz
+     cd argus-1.5.0-linux-x86_64
      ./argus version
      ./argus scan /path/to/repo -f text
      ./argus owasp 89 79
 
    Требования: Linux x86_64, glibc >= 2.35 (Debian 12+, Ubuntu 22.04+,
-   ALT 10+, ROSA 2021+).
+   ALT 10+, ROSA 2021+). GUI в архиве — Tk (`python3-tk`); PySide6 в
+   портативный runtime не входит.
 
-2. Для Debian: argus-scanner_1.4.0-1_all.deb
-   Универсальный пакет, Architecture: all, около 245 КБ. При установке
-   создаёт приватный runtime в /var/lib/argus-scanner и скачивает актуальный
-   Semgrep с PyPI. Нужны сеть (или wheelhouse) и python3 >= 3.10.
+2. Для Debian: argus-scanner_1.5.0-1_all.deb
+   Универсальный пакет, Architecture: all. При установке создаёт приватный
+   runtime в /var/lib/argus-scanner, скачивает актуальный Semgrep и
+   PySide6-Essentials с PyPI. Нужны сеть (или wheelhouse) и python3 >= 3.10.
 
-     sudo apt install ./argus-scanner_1.4.0-1_all.deb
+     sudo apt install ./argus-scanner_1.5.0-1_all.deb
+     argus-gui                       # Qt-интерфейс
      argus scan /path/to/repo -f sarif -o argus.sarif
 
-3. Исходники: argus-scanner_1.4.0-1.dsc, orig.tar.gz, debian.tar.xz
-   Сборка: dpkg-source -x ...dsc && cd argus-scanner-1.4.0 &&
+3. Исходники: argus-scanner_1.5.0-1.dsc, orig.tar.gz, debian.tar.xz
+   Сборка: dpkg-source -x ...dsc && cd argus-scanner-1.5.0 &&
            dpkg-buildpackage -us -uc -b
 
 Артефакты
 ---------
-  argus-1.4.0-linux-x86_64.tar.gz          ~121 МБ  портативный архив
-  argus-scanner_1.4.0-1_all.deb            ~245 КБ  универсальный .deb
-  argus-scanner_1.4.0-1.dsc                        source package
-  argus-scanner_1.4.0.orig.tar.gz          ~270 КБ  исходники
-  argus-scanner_1.4.0-1.debian.tar.xz       ~10 КБ  debian/
+  argus-1.5.0-linux-x86_64.tar.gz          ~121 МБ  портативный архив
+  argus-scanner_1.5.0-1_all.deb            ~250 КБ  универсальный .deb
+  argus-scanner_1.5.0-1.dsc                        source package
+  argus-scanner_1.5.0.orig.tar.gz          ~280 КБ  исходники
+  argus-scanner_1.5.0-1.debian.tar.xz       ~12 КБ  debian/
   SHA256SUMS                                       контрольные суммы
 
 Проверка
 --------
   sha256sum -c SHA256SUMS
 
-Основное в 1.4.0
+Основное в 1.5.0
 ----------------
-  * OWASP Top 10 (2017/2021/2025) для находок с CWE, свои файлы и
-    обновление справочника из OWASP/Top10;
-  * GUI-поля для --owasp-version/--owasp-file/--no-owasp;
+  * Qt-интерфейс (PySide6) с навигацией, фильтрами и карточкой находки;
+  * Qt из .deb без системного python3-pyside6, обновление runtime на месте;
+  * --tk, --upgrade-gui и --no-gui; резервный Tk-интерфейс;
+  * OWASP Top 10 (2017/2021/2025) для находок с CWE;
   * экосистемы Debian и Ubuntu: control, dpkg, .deb, OSV по релизам;
-  * предложения замен из Semgrep-правил во всех форматах отчётов;
   * Java dataflow engine и наборы правил для 7 языков;
   * SCA через OSV (онлайн и офлайн, --offline с локальной базой);
   * поиск секретов, IaC-проверки, baseline и подавления;
-  * форматы text/json/sarif/md/sbom/vex, quality gates, EPSS/KEV;
-  * портативный архив с собственным CPython — не зависит от системы;
-  * универсальный .deb ставит актуальный Semgrep при установке.
+  * форматы text/json/sarif/md/sbom/vex, quality gates, EPSS/KEV.
 
 Лицензия
 --------

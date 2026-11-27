@@ -11,7 +11,7 @@ import posixpath
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 TOOL_NAME = "argus"
-TOOL_VERSION = "1.4.0"
+TOOL_VERSION = "1.5.0"
 TOOL_URL = "https://example.invalid/argus"
 
 

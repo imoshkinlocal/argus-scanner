@@ -3,6 +3,33 @@
 Все заметные изменения проекта. Формат — по мотивам Keep a Changelog,
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.5.0] — 2026-11-27
+
+### Добавлено
+
+- Новый GUI на Qt (PySide6): боковая навигация, таблица находок с фильтрами,
+  чипами severity и группировкой, карточка выбранной находки, сводка с OWASP
+  Top 10, вкладки зависимостей, справочника CWE и справки.
+- Debian-пакет ставит `PySide6-Essentials` в приватный runtime, поэтому
+  `argus-gui` из `.deb` открывает Qt без системного `python3-pyside6`.
+  `postinst` добавляет Qt и при обновлении с 1.4.0, не пересобирая runtime.
+- `argus-setup-runtime --upgrade-gui` и `--no-gui`; `--list` показывает
+  версию GUI. Если PySide6 недоступен для платформы, установка не падает,
+  а GUI переходит на Tk.
+- Логика интерфейса вынесена в `argus/gui_core.py` без зависимости от
+  тулкита, чтобы её использовали оба окна.
+
+### Изменено
+
+- `argus-gui` по умолчанию открывает Qt-окно; `--tk` принудительно включает
+  прежний Tk-интерфейс, который остаётся резервным.
+- `pip install 'argus-scanner[gui]'` устанавливает PySide6.
+
+### Исправлено
+
+- Текстовый отчёт больше не дублирует номер CWE, которого нет в локальном
+  справочнике (`CWE-297 (CWE-297)` → `CWE-297`).
+
 ## [1.4.0] — 2026-11-27
 
 ### Добавлено
@@ -142,6 +169,7 @@
 - `argus-scanner_1.1.0-3` — универсальный пакет без вендоринга.
 - `argus-scanner_1.1.0-4` — исправление TOML на Python 3.10 (`tomli`).
 
+[1.5.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.5.0
 [1.4.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.4.0
 [1.3.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.3.0
 [1.2.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.2.0

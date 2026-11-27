@@ -1,3 +1,18 @@
+argus-scanner (1.5.0-1) unstable; urgency=medium
+
+  * Add a Qt (PySide6) desktop front-end: navigation sidebar, filterable
+    findings table, severity chips, finding card with OWASP Top 10, plus
+    dependency, CWE and help pages.  The Tk window remains available with
+    --tk and is used automatically when PySide6 is missing.
+  * Install PySide6-Essentials into the private runtime, so the .deb opens
+    the Qt window without a system python3-pyside6.  postinst adds Qt to a
+    runtime created by 1.4.0; argus-setup-runtime gains --upgrade-gui and
+    --no-gui, and --list reports the GUI version.
+  * Move toolkit-independent GUI logic into argus/gui_core.py.
+  * Do not repeat an unknown CWE number as its own name in text reports.
+
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Fri, 27 Nov 2026 20:30:00 +0300
+
 argus-scanner (1.4.0-1) unstable; urgency=medium
 
   * Map every finding that has a CWE to the OWASP Top 10.  Bundled editions

@@ -82,8 +82,18 @@ argus-setup-runtime is not affected.
 
 GUI
 ---
-The Tk front-end is in the same binary package.  It needs python3-tk
-(Recommends) and a graphical session; the CLI works without either.
+The desktop front-end is in the same binary package.  It prefers Qt: during
+installation argus-setup-runtime adds PySide6-Essentials to the private
+runtime, so argus-gui opens the Qt window without a system python3-pyside6.
+
+  argus-gui              # Qt when PySide6 is present in the runtime
+  argus-gui --tk         # force the Tk fallback
+  argus-setup-runtime --upgrade-gui   # add Qt to an existing runtime
+  argus-setup-runtime --no-gui        # skip Qt during a rebuild
+
+If PySide6 has no wheel for the platform, or the package index is
+unreachable, the GUI falls back to Tk; install python3-tk (Recommends) in
+that case.  The CLI works without any GUI libraries.
 
 Offline dependency scanning
 ---------------------------

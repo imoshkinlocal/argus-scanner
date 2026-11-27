@@ -137,8 +137,8 @@ OWASP Top 10, remediation, сниппеты) → запись нового basel
 glibc 2.35+ (Debian 12, Ubuntu 22.04 и новее):
 
 ```bash
-tar xzf argus-1.4.0-linux-x86_64.tar.gz
-cd argus-1.4.0-linux-x86_64
+tar xzf argus-1.5.0-linux-x86_64.tar.gz
+cd argus-1.5.0-linux-x86_64
 ./argus version
 ./argus scan /path/to/repo -f text
 ```
@@ -147,7 +147,7 @@ cd argus-1.4.0-linux-x86_64
 ставится с PyPI при установке.
 
 ```bash
-sudo apt install ./argus-scanner_1.4.0-1_all.deb
+sudo apt install ./argus-scanner_1.5.0-1_all.deb
 ```
 
 Ссылки на файлы — в разделе [Releases](../../releases/latest).
@@ -220,7 +220,7 @@ Debian/Ubuntu: `debian/control`, база dpkg и отдельные `.deb`:
 ```bash
 argus sbom . -f cyclonedx -o src.cdx.json              # debian/control + changelog
 argus sbom . --deb-root / -f cyclonedx -o host.cdx.json  # установленные пакеты
-argus sbom . --deb ./argus-scanner_1.4.0-1_all.deb \
+argus sbom . --deb ./argus-scanner_1.5.0-1_all.deb \
     --deb-suite bookworm -f md -o pkg.md               # один .deb
 argus sca . --deb-root / -f json -o host-vulns.json     # OSV для Debian/Ubuntu
 argus sca . --deb ./pkg.deb --deb-suite jammy           # Ubuntu-пакет
@@ -546,25 +546,33 @@ OWASP Top 10 2021: A02:2021 ×1, A03:2021 ×7, A07:2021 ×2, A08:2021 ×1
 
 ### Карточка OWASP Top 10 в GUI
 
-На скриншоте — вкладка «Результаты» после сканирования того же демо-проекта.
-Сверху — сводка с строкой «OWASP Top 10» (распределение по категориям). Таблица
-показывает колонку OWASP для каждой находки. Справа — карточка выбранной
-находки: CWE, категория OWASP с названием и ссылкой на официальную страницу,
-фрагмент кода и рекомендация.
+На скриншоте — Qt-окно, раздел «Результаты», после сканирования того же
+демо-проекта. Слева — навигация, в центре — сводка с распределением
+«OWASP Top 10» и таблица находок, внизу — карточка выбранной находки: CWE,
+категория OWASP с названием и ссылкой на официальную страницу, фрагмент кода
+и рекомендация.
 
-![GUI: сводка, OWASP Top 10 и карточка находки](docs/images/gui-owasp.png)
+![GUI: сводка, OWASP Top 10 и карточка находки](docs/images/gui-qt.png)
 
 ## GUI
 
-Графический интерфейс на `tkinter` (стандартная библиотека, отдельных
-зависимостей нет). Запуск из корня проекта:
+Интерфейс на Qt (PySide6): слева навигация, в центре таблица находок, справа
+карточка выбранной находки. Если PySide6 не установлен, автоматически
+открывается резервное окно на `tkinter` — CLI и сканирование от этого не
+зависят. Запуск из корня проекта:
 
 ```bash
-./argus-gui.py          # скрипт сам переключится на .venv, если он есть
-argus-gui               # после pip install -e .
+pip install -e '.[gui]'  # PySide6 для Qt-интерфейса
+./argus-gui.py           # скрипт сам переключится на .venv, если он есть
+argus-gui                # после pip install -e .
+argus-gui --tk           # принудительно старое окно на tkinter
 ```
 
-На Debian/Ubuntu для tkinter может понадобиться пакет `python3-tk`.
+Для резервного Tk-интерфейса на Debian/Ubuntu может понадобиться пакет
+`python3-tk`. Пакет `.deb` ставит PySide6 в свой приватный runtime
+(`argus-setup-runtime`), поэтому `argus-gui` из `.deb` открывает Qt без
+системного `python3-pyside6`; отключить это можно флагом `--no-gui` или
+переменной `ARGUS_SKIP_RUNTIME_SETUP=1`.
 
 Что есть в окне:
 
@@ -993,7 +1001,7 @@ Java-анализ кэшируется в SQLite по содержимому ф�
   "$schema": "https://json.schemastore.org/argus-report-1.1.json",
   "schema_version": "1.1",
   "generated_at": "2026-11-18T09:00:00Z",
-  "tool": {"name": "argus", "version": "1.4.0", "engines": ["argus-java", "osv"]},
+  "tool": {"name": "argus", "version": "1.5.0", "engines": ["argus-java", "osv"]},
   "target": "/abs/path",
   "summary": {
     "total": 2,
@@ -1247,7 +1255,7 @@ argus sca . --deb ./pkg_2.0-1ubuntu1_amd64.deb --deb-suite jammy --offline
   "version": 1,
   "metadata": {
     "timestamp": "…",
-    "tools": [{"vendor": "argus", "name": "argus", "version": "1.4.0"}],
+    "tools": [{"vendor": "argus", "name": "argus", "version": "1.5.0"}],
     "component": {"type": "application", "name": "my-project"}
   },
   "components": [

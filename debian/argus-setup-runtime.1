@@ -1,4 +1,4 @@
-.TH ARGUS-SETUP-RUNTIME 1 "2026-11-27" "argus 1.4.0" "User Commands"
+.TH ARGUS-SETUP-RUNTIME 1 "2026-11-27" "argus 1.5.0" "User Commands"
 .SH NAME
 argus-setup-runtime \- provision or update the Python runtime used by argus
 .SH SYNOPSIS
@@ -14,7 +14,12 @@ package and the current releases of its dependencies.
 .PP
 Because the package contains no compiled objects, the environment matches the
 local Python version and architecture, and Semgrep is updated whenever the
-runtime is rebuilt.  The
+runtime is rebuilt.  The Qt GUI libraries
+.RB ( PySide6-Essentials )
+are installed into the same environment, so
+.B argus-gui
+opens the Qt window.  If PySide6 has no wheel for the platform or the index is
+unreachable, the GUI falls back to Tk and the command still succeeds.  The
 .B postinst
 script runs this command once during installation; it never fails the
 installation if the download is impossible.
@@ -38,8 +43,18 @@ Pin Semgrep to an exact version instead of the latest release.
 Update only Semgrep inside an existing runtime.  The new version is verified;
 if it does not run, the previous one is reinstalled.
 .TP
+.B \-\-upgrade-gui
+Install or update the Qt GUI libraries inside an existing runtime.  This is
+what
+.B postinst
+runs when a runtime created by an older release has no PySide6 yet.
+.TP
+.B \-\-no-gui
+Do not install the Qt GUI libraries.  The GUI then uses Tk and needs
+.BR python3-tk .
+.TP
 .B \-\-list
-Print the runtime location, Python, argus and Semgrep versions and size.
+Print the runtime location, Python, argus, Semgrep and GUI versions and size.
 .TP
 .B \-\-remove
 Delete the runtime.

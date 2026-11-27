@@ -14,6 +14,13 @@ rm -rf /var/lib/argus-scanner/semgrep-venv
 
 if [ -x /var/lib/argus-scanner/runtime/bin/argus ] && \
         [ "${ARGUS_FORCE_RUNTIME_SETUP:-0}" != "1" ]; then
+    # Upgrade path from a release without the Qt GUI: add PySide6 to the
+    # existing runtime instead of rebuilding it.
+    if [ "${ARGUS_SKIP_RUNTIME_SETUP:-0}" != "1" ] && \
+            ! /var/lib/argus-scanner/runtime/bin/python -c 'import PySide6' \
+                >/dev/null 2>&1; then
+        argus-setup-runtime --upgrade-gui || true
+    fi
     exit 0
 fi
 
