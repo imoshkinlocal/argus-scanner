@@ -34,11 +34,12 @@ QUERY_TTL_SECONDS = 12 * 60 * 60
 
 SUPPORTED_ECOSYSTEMS = [
     "Maven", "PyPI", "npm", "Go", "Packagist", "RubyGems",
-    "crates.io", "NuGet", "ConanCenter", "Debian",
+    "crates.io", "NuGet", "ConanCenter", "Debian", "Ubuntu",
 ]
 
-#: Ecosystems downloaded by default.  Debian is large (~85 MB) and only needed
-#: for Debian package inventories, so it stays opt-in: ``argus db update --ecosystem Debian``.
+#: Ecosystems downloaded by default.  Debian (~85 MB) and Ubuntu (~800 MB) are
+#: only needed for package inventories, so they stay opt-in:
+#: ``argus db update --ecosystem Debian`` / ``--ecosystem Ubuntu``.
 DEFAULT_DB_ECOSYSTEMS = [
     "Maven", "PyPI", "npm", "Go", "Packagist", "RubyGems",
     "crates.io", "NuGet", "ConanCenter",
@@ -46,6 +47,10 @@ DEFAULT_DB_ECOSYSTEMS = [
 
 #: Ecosystems with a published offline archive (same set as the API support).
 DB_ECOSYSTEMS = SUPPORTED_ECOSYSTEMS
+
+#: Debian-family ecosystems: one archive holds every release, and the release
+#: is selected per package (``Debian:12``, ``Ubuntu:22.04:LTS``).
+DEB_FAMILY = ("Debian", "Ubuntu")
 
 
 class OSVError(RuntimeError):
@@ -74,15 +79,15 @@ def osv_name(package: Package) -> str:
     """Return the package name exactly as OSV expects it."""
     if package.ecosystem == "PyPI":
         return package.name.lower().replace("_", "-").replace(".", "-")
-    if package.ecosystem == "Debian" and package.source_name:
-        # OSV publishes Debian advisories under source package names.
+    if package.ecosystem in DEB_FAMILY and package.source_name:
+        # OSV publishes Debian/Ubuntu advisories under source package names.
         return package.source_name
     return package.name
 
 
 def osv_version(package: Package) -> str:
     """Return the version OSV ranges refer to (the source version for Debian)."""
-    if package.ecosystem == "Debian" and package.source_version:
+    if package.ecosystem in DEB_FAMILY and package.source_version:
         return package.source_version
     return package.version
 
@@ -90,19 +95,20 @@ def osv_version(package: Package) -> str:
 def osv_ecosystem(package: Package) -> str:
     """Return the OSV ecosystem used for queries.
 
-    OSV publishes Debian advisories per release (``Debian:12``); without a known
-    suite there is no safe way to match them, so the result is empty and the
-    caller must skip the package instead of guessing.
+    OSV publishes Debian-family advisories per release (``Debian:12``,
+    ``Ubuntu:22.04:LTS``); without a known suite there is no safe way to match
+    them, so the result is empty and the caller must skip the package instead
+    of guessing.
     """
-    if package.ecosystem == "Debian":
+    if package.ecosystem in DEB_FAMILY:
         from .debian import debian_ecosystem
 
-        return debian_ecosystem(package.distro)
+        return debian_ecosystem(package.distro, package.ecosystem)
     return package.ecosystem
 
 
 def osv_archive(package: Package) -> str:
-    """Return the offline archive name; Debian ships all suites in one file."""
+    """Return the offline archive name; Debian-family ships all suites in one file."""
     return "Debian" if package.ecosystem == "Debian" else package.ecosystem
 
 
@@ -275,9 +281,9 @@ class OSVClient:
         skipped_suite = 0
         for package in packages:
             ecosystem = osv_ecosystem(package)
-            if package.ecosystem == "Debian" and not ecosystem:
-                # A Debian advisory is tied to one release; without the suite a
-                # query would return versions from other releases (false fixes).
+            if package.ecosystem in DEB_FAMILY and not ecosystem:
+                # A Debian-family advisory is tied to one release; without the
+                # suite a query would return versions from other releases.
                 skipped_suite += 1
                 continue
             version = osv_version(package)
@@ -289,7 +295,7 @@ class OSVClient:
         if skipped:
             self._log(f"[osv] skipped {skipped} package(s) without a version")
         if skipped_suite:
-            self._log(f"[osv] skipped {skipped_suite} Debian package(s) without a suite")
+            self._log(f"[osv] skipped {skipped_suite} Debian/Ubuntu package(s) without a suite")
         if not unique:
             return []
 
@@ -505,10 +511,11 @@ class LocalOSVDB:
                     for affected in document.get("affected") or []:
                         affected_package = affected.get("package") or {}
                         affected_ecosystem = str(affected_package.get("ecosystem") or "")
-                        if ecosystem == "Debian":
-                            # One archive holds Debian:11, Debian:12, ...; the
-                            # suite is selected later, per package.
-                            if not affected_ecosystem.startswith("Debian:"):
+                        if ecosystem in DEB_FAMILY:
+                            # One archive holds Debian:11, Debian:12, ... (or
+                            # Ubuntu:22.04:LTS, ...); the suite is selected
+                            # later, per package.
+                            if not affected_ecosystem.startswith(ecosystem + ":"):
                                 continue
                         elif affected_ecosystem != ecosystem:
                             continue

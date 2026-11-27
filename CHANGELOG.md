@@ -3,31 +3,41 @@
 Все заметные изменения проекта. Формат — по мотивам Keep a Changelog,
 версии — [SemVer](https://semver.org/lang/ru/).
 
-## [Unreleased]
+## [1.3.0] — 2026-11-27
 
 ### Добавлено
 
 - Экосистема `Debian` для SCA и SBOM: `debian/control` (build/runtime/
   optional/dev-зависимости), dpkg status (`--deb-root`, `--deb-status`) и
   отдельные `.deb` (`--deb`).
+- Экосистема `Ubuntu` в том же Debian-семействе: релизы `Ubuntu:<YY.MM>[:LTS]`
+  (22.04:LTS, 24.04:LTS, 24.10…), vendor-aware определение релиза из
+  `os-release`/`debian/changelog`, purl `pkg:deb/ubuntu/…`, отдельный
+  offline-архив `--ecosystem Ubuntu`.
+- GUI: блок «Пакеты Debian/Ubuntu» — корень системы (`--deb-root`), файл
+  статуса dpkg (`--deb-status`), список `.deb` (`--deb`) и релиз
+  (`--deb-suite`), включая выбор каталога и нескольких файлов.
 - Парсер `debian/changelog` задаёт имя и версию проекта в SBOM; purl получает
   `arch` и `distro` qualifiers (`pkg:deb/debian/openssl@…?arch=amd64&distro=bookworm`).
-- Компаратор версий dpkg: эпохи, `~`, ревизии Debian, `+deb12u1`.
-- OSV для Debian использует suite-экосистемы `Debian:<N>` (11/12/13/14);
-  suite определяется из `/etc/debian_version`, `os-release`, rootfs или
-  `debian/changelog`, переопределяется `--deb-suite`.
+- Компаратор версий dpkg: эпохи, `~`, ревизии Debian, `+deb12u1`; тот же
+  порядок используется для Ubuntu (`3.0.2-0ubuntu1.16` > `…1.10`).
+- OSV для Debian/Ubuntu использует suite-экосистемы `Debian:<N>` (11/12/13/14)
+  и `Ubuntu:<release>`; релиз определяется из `/etc/os-release`,
+  `/etc/debian_version`, rootfs или `debian/changelog`, переопределяется
+  `--deb-suite` (`bookworm`, `jammy`, `12`, `22.04`).
 - `tests/test_debian.py`: deb822, control, changelog, status, `.deb`,
-  dpkg-версии, purl, suite-детект и фильтрация OSV по релизу.
+  dpkg-версии, purl, suite-детект Debian и Ubuntu, фильтрация OSV по релизу;
+  `tests/test_gui.py` — проверка новых аргументов `build_scan_command`.
 
 ### Изменено
 
 - Debian-зависимости без версии (`debian/control` и необязательные поля)
   включаются как unversioned: версия в purl опускается, OSV-запрос не
   выполняется.
-- `argus db update` по умолчанию не скачивает Debian-архив (~85 МБ); он
-  загружается явно через `--ecosystem Debian`.
-- При неизвестном suite Debian-пакеты пропускаются с предупреждением, чтобы не
-  подставлять fixed-версии из чужого релиза.
+- `argus db update` по умолчанию не скачивает архивы Debian (~85 МБ) и Ubuntu
+  (~800 МБ); они загружаются явно через `--ecosystem Debian` / `--ecosystem Ubuntu`.
+- При неизвестном релизе Debian/Ubuntu-пакеты пропускаются с предупреждением,
+  чтобы не подставлять fixed-версии из чужой ветки.
 - Offline-база OSV пропускает записи с `withdrawn` (их отфильтровывает и
   online API), поэтому офлайн- и онлайн-результаты совпадают.
 

@@ -1,3 +1,22 @@
+argus-scanner (1.3.0-1) unstable; urgency=medium
+
+  * Add the Ubuntu ecosystem next to Debian.  Releases are addressed as
+    Ubuntu:<YY.MM>[:LTS] (22.04:LTS, 24.04:LTS, 24.10), detected from
+    /etc/os-release or the debian/changelog distribution and overridable with
+    --deb-suite.  Ubuntu versions use the dpkg comparator and the purl
+    namespace is pkg:deb/ubuntu/.
+  * Accept Debian-family packages in debian/control, dpkg status
+    (--deb-root/--deb-status) and binary .deb files (--deb); packages without
+    a known release are skipped with a warning instead of matching another
+    branch.
+  * Expose the Debian/Ubuntu inputs in the GUI: system root, dpkg status file,
+    .deb list and release, including directory and multi-file pickers.
+  * Add Ubuntu to supported OSV ecosystems; keep the ~800 MB Ubuntu and
+    ~85 MB Debian offline archives opt-in via `argus db update --ecosystem`.
+  * Bump the version so the portable archive, wheel and Debian package agree.
+
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Fri, 27 Nov 2026 15:00:00 +0300
+
 argus-scanner (1.2.0-1) unstable; urgency=medium
 
   * Surface Semgrep fixes as suggested replacements in JSON

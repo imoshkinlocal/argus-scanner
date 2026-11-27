@@ -465,3 +465,144 @@ def test_control_packages_inherit_changelog_distribution(tmp_path):
     package = next(iter(inventory.unique.values()))
     assert package.distro == "trixie"
     assert package.purl() == "pkg:deb/debian/debhelper-compat@13?distro=trixie"
+
+
+# --------------------------------------------------------------------------- Ubuntu
+
+UBUNTU_OS_RELEASE = """\
+PRETTY_NAME="Ubuntu 22.04.4 LTS"
+NAME="Ubuntu"
+ID=ubuntu
+ID_LIKE=debian
+VERSION_ID="22.04"
+VERSION_CODENAME=jammy
+UBUNTU_CODENAME=jammy
+"""
+
+
+def test_normalize_ubuntu_suite():
+    jammy = normalize_suite("jammy", "ubuntu")
+    assert (jammy.codename, jammy.major, jammy.vendor) == ("jammy", "22.04", "ubuntu")
+    assert jammy.package_ecosystem == "Ubuntu"
+    assert jammy.ecosystem == "Ubuntu:22.04:LTS"
+    # A numeric release and an explicit prefix both carry the vendor.
+    assert normalize_suite("22.04").ecosystem == "Ubuntu:22.04:LTS"
+    assert normalize_suite("ubuntu:noble").ecosystem == "Ubuntu:24.04:LTS"
+    # Interim releases are not LTS and must not grow the suffix.
+    assert normalize_suite("24.10").ecosystem == "Ubuntu:24.10"
+    assert debian_ecosystem("jammy", "Ubuntu") == "Ubuntu:22.04:LTS"
+    # Debian codenames must not be mistaken for Ubuntu ones.
+    assert normalize_suite("bookworm").ecosystem == "Debian:12"
+
+
+def test_detect_ubuntu_suite_from_os_release(tmp_path):
+    (tmp_path / "etc").mkdir()
+    (tmp_path / "etc" / "os-release").write_text(UBUNTU_OS_RELEASE)
+    # Ubuntu also ships a Debian base release; os-release must win.
+    (tmp_path / "etc" / "debian_version").write_text("bookworm/sid\n")
+    suite = detect_suite(str(tmp_path))
+    assert (suite.codename, suite.major, suite.vendor) == ("jammy", "22.04", "ubuntu")
+    assert suite.ecosystem == "Ubuntu:22.04:LTS"
+
+
+def test_parse_status_and_purl_for_ubuntu():
+    result = parse_status(STATUS, distro="jammy", ecosystem="Ubuntu")
+    package = result.packages[0]
+    assert package.ecosystem == "Ubuntu"
+    assert package.purl() == (
+        "pkg:deb/ubuntu/openssl@1.1.1n-0%2Bdeb11u5?arch=amd64&distro=jammy")
+
+
+def test_osv_ecosystem_and_archive_for_ubuntu():
+    known = Package(name="openssl", version="3.0.2-0ubuntu1.10", ecosystem="Ubuntu",
+                    manifest="status", distro="jammy")
+    unknown = Package(name="openssl", version="3.0.2-0ubuntu1.10", ecosystem="Ubuntu",
+                      manifest="status")
+    assert osv_ecosystem(known) == "Ubuntu:22.04:LTS"
+    assert osv_archive(known) == "Ubuntu"
+    assert osv_ecosystem(unknown) == ""
+    assert OSVClient(use_cache=False).query([unknown]) == []
+
+
+def test_ubuntu_versions_use_dpkg_ordering():
+    assert versions.compare("3.0.2-0ubuntu1.16", "3.0.2-0ubuntu1.10", "Ubuntu") > 0
+    events = [{"introduced": "0"}, {"fixed": "3.0.2-0ubuntu1.16"}]
+    assert versions.range_contains("3.0.2-0ubuntu1.10", events, "Ubuntu")
+    assert not versions.range_contains("3.0.2-0ubuntu1.16", events, "Ubuntu")
+
+
+def test_offline_database_filters_ubuntu_release(tmp_path):
+    document = {
+        "id": "UBUNTU-CVE-2023-0001",
+        "affected": [
+            {"package": {"name": "openssl", "ecosystem": "Ubuntu:22.04:LTS"},
+             "versions": ["3.0.2-0ubuntu1.10"],
+             "ranges": [{"type": "ECOSYSTEM",
+                         "events": [{"introduced": "0"},
+                                    {"fixed": "3.0.2-0ubuntu1.16"}]}]},
+            {"package": {"name": "openssl", "ecosystem": "Ubuntu:24.04:LTS"},
+             "versions": ["3.0.2-0ubuntu1.10"],
+             "ranges": [{"type": "ECOSYSTEM",
+                         "events": [{"introduced": "0"},
+                                    {"fixed": "3.0.4-1ubuntu1"}]}]},
+        ],
+    }
+    archive = tmp_path / "Ubuntu" / "all.zip"
+    archive.parent.mkdir()
+    with zipfile.ZipFile(archive, "w") as handle:
+        handle.writestr("UBUNTU-CVE-2023-0001.json", json.dumps(document))
+
+    database = LocalOSVDB(directory=str(tmp_path))
+    jammy = Package(name="openssl", version="3.0.2-0ubuntu1.10", ecosystem="Ubuntu",
+                    manifest="status", distro="jammy")
+    noble = Package(name="openssl", version="3.0.2-0ubuntu1.10", ecosystem="Ubuntu",
+                    manifest="status", distro="noble")
+    assert [m.fixed_version for m in database.query([jammy])] == ["3.0.2-0ubuntu1.16"]
+    assert [m.fixed_version for m in database.query([noble])] == ["3.0.4-1ubuntu1"]
+
+
+def test_collect_ubuntu_root_detects_vendor(tmp_path):
+    root = tmp_path / "root"
+    (root / "etc").mkdir(parents=True)
+    (root / "etc" / "os-release").write_text(UBUNTU_OS_RELEASE)
+    (root / "var" / "lib" / "dpkg").mkdir(parents=True)
+    (root / "var" / "lib" / "dpkg" / "status").write_text(STATUS)
+    inventory = collect(deb_roots=[str(root)])
+    package = inventory.packages[0]
+    assert (package.ecosystem, package.distro) == ("Ubuntu", "jammy")
+    assert inventory.issues == []
+    assert osv_ecosystem(package) == "Ubuntu:22.04:LTS"
+
+
+def test_collect_ubuntu_deb_uses_explicit_suite(tmp_path):
+    path = write_deb(tmp_path / "demo.deb",
+                     "Package: demo\nVersion: 1.0-1\nArchitecture: all\n"
+                     "Depends: libc6 (>= 2.35)\n")
+    inventory = collect(deb_files=[str(path)], suite="jammy")
+    assert {package.ecosystem for package in inventory.packages} == {"Ubuntu"}
+    assert {package.distro for package in inventory.packages} == {"jammy"}
+    assert inventory.packages[0].purl() == (
+        "pkg:deb/ubuntu/demo@1.0-1?arch=all&distro=jammy")
+
+
+def test_control_packages_inherit_ubuntu_changelog(tmp_path):
+    (tmp_path / "debian").mkdir()
+    (tmp_path / "debian" / "control").write_text(
+        "Source: demo\nBuild-Depends: debhelper-compat (= 13)\n")
+    (tmp_path / "debian" / "changelog").write_text(
+        "demo (2.0-1) jammy; urgency=medium\n")
+    inventory = collect_inventory(str(tmp_path), SCAOptions())
+    package = next(iter(inventory.unique.values()))
+    assert (package.ecosystem, package.distro) == ("Ubuntu", "jammy")
+    assert package.purl() == "pkg:deb/ubuntu/debhelper-compat@13?distro=jammy"
+
+
+def test_ubuntu_ecosystem_filter_keeps_packages(tmp_path):
+    (tmp_path / "debian").mkdir()
+    (tmp_path / "debian" / "control").write_text(
+        "Source: demo\nBuild-Depends: debhelper-compat (= 13)\n")
+    (tmp_path / "debian" / "changelog").write_text(
+        "demo (2.0-1) jammy; urgency=medium\n")
+    inventory = collect_inventory(
+        str(tmp_path), SCAOptions(ecosystems=("Ubuntu",)))
+    assert [package.name for package in inventory.unique.values()] == ["debhelper-compat"]

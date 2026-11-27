@@ -117,18 +117,20 @@ def collect_inventory(root: str, options: SCAOptions, progress=None) -> Inventor
         for manifest in debian.manifests:
             if manifest not in manifests:
                 manifests.append(manifest)
-    else:
-        # An explicit suite (or the changelog target) also annotates packages
-        # parsed from debian/control.
-        from .debian import normalize_suite, source_identity
 
-        suite = normalize_suite(options.deb_suite)
-        if not suite.known:
-            suite = normalize_suite(source_identity(root).get("distribution", ""))
-        if suite.known:
-            for package in packages:
-                if package.ecosystem == "Debian" and not package.distro:
-                    package.distro = suite.label
+    # An explicit suite (or the changelog target) also annotates packages
+    # parsed from ``debian/control``; dpkg and ``.deb`` packages already carry
+    # their own suite and keep it.
+    from .debian import normalize_suite, source_identity
+
+    suite = normalize_suite(options.deb_suite)
+    if not suite.known:
+        suite = normalize_suite(source_identity(root).get("distribution", ""))
+    if suite.known:
+        for package in packages:
+            if package.ecosystem in ("Debian", "Ubuntu") and not package.distro:
+                package.distro = suite.label
+                package.ecosystem = suite.package_ecosystem
 
     # A lock file may not record which packages are direct (poetry.lock,
     # uv.lock, composer.lock, Cargo.lock).  When a sibling manifest declares a
@@ -260,14 +262,15 @@ def scan(root: str, options: SCAOptions, progress=None) -> Tuple[List[Finding], 
 
     unknown_suite = sorted({
         package.name for package in unique.values()
-        if package.ecosystem == "Debian" and not osv_ecosystem(package)
+        if package.ecosystem in ("Debian", "Ubuntu") and not osv_ecosystem(package)
     })
     if unknown_suite:
         errors.append(
-            "Debian advisories need a release (OSV ecosystem Debian:<release>); "
-            "skipped " + ", ".join(unknown_suite[:10])
+            "Debian/Ubuntu advisories need a release (OSV ecosystem "
+            "Debian:<release> or Ubuntu:<YY.MM>); skipped "
+            + ", ".join(unknown_suite[:10])
             + ("…" if len(unknown_suite) > 10 else "")
-            + ". Pass --deb-suite (for example --deb-suite bookworm)"
+            + ". Pass --deb-suite (for example --deb-suite bookworm or jammy)"
         )
 
     matches: List[VulnMatch] = []

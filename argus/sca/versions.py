@@ -157,7 +157,8 @@ def _deb_compare(left: str, right: str) -> int:
 
 def compare(left: str, right: str, ecosystem: str = "") -> int:
     """Return -1, 0 or 1 when ``left`` is older, equal or newer than ``right``."""
-    if str(ecosystem).lower() == "debian":
+    # Debian and Ubuntu share dpkg version ordering (including epochs and ~).
+    if str(ecosystem).lower() in ("debian", "ubuntu"):
         return _deb_compare(str(left), str(right))
     if left == right:
         return 0

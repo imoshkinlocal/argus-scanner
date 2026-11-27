@@ -300,3 +300,29 @@ def test_format_finding_renders_snippet_and_remediation():
     assert "> 3 | b" in text
     assert "Как исправить:" in text
     assert "Use a prepared statement." in text
+
+
+def test_scan_command_debian_options():
+    command = gui.build_scan_command(
+        "/src", "/tmp/r.json",
+        deb_roots=("/",), deb_status=("/tmp/status",),
+        deb_files=("/tmp/a.deb", "/tmp/b.deb"), deb_suite="jammy")
+    assert command.count("--deb-root") == 1
+    assert command[command.index("--deb-root") + 1] == "/"
+    assert command[command.index("--deb-status") + 1] == "/tmp/status"
+    assert command.count("--deb") == 2
+    assert command[command.index("--deb-suite") + 1] == "jammy"
+
+
+def test_scan_command_without_debian_options_stays_clean():
+    command = gui.build_scan_command("/src", "/tmp/r.json")
+    assert "--deb-root" not in command
+    assert "--deb-status" not in command
+    assert "--deb" not in command
+    assert "--deb-suite" not in command
+
+
+def test_help_mentions_debian_support():
+    assert "--deb-root" in gui.HELP_TEXT
+    assert "--deb-suite" in gui.HELP_TEXT
+    assert "Ubuntu:22.04:LTS" in gui.HELP_TEXT

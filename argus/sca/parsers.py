@@ -51,6 +51,7 @@ _PURL_TYPES = {
     "ConanCenter": "conan",
     "Hex": "hex",
     "Debian": "deb",
+    "Ubuntu": "deb",
 }
 
 
@@ -90,21 +91,21 @@ class Package:
     def purl(self) -> str:
         purl_type = _PURL_TYPES.get(self.ecosystem, self.ecosystem.lower())
         name = self.name
+        deb_family = self.ecosystem in ("Debian", "Ubuntu")
         if self.ecosystem == "Maven" and ":" in name:
             group, artifact = name.split(":", 1)
             name = f"{quote(group, safe='.')}/{quote(artifact, safe='')}"
         elif self.ecosystem == "npm" and name.startswith("@"):
             name = "%40" + name[1:].replace("/", "%2F")
-        elif self.ecosystem == "Debian":
-            # The purl namespace is the distribution; argus targets Debian-family
-            # systems and has no reliable way to detect a derivative here.
-            name = "debian/" + quote(name, safe="-._~")
+        elif deb_family:
+            # The purl namespace is the distribution (``debian`` or ``ubuntu``).
+            name = self.ecosystem.lower() + "/" + quote(name, safe="-._~")
         else:
             name = quote(name, safe="/-._~")
-        version_safe = ".-_~" if self.ecosystem == "Debian" else ".-_~+"
+        version_safe = ".-_~" if deb_family else ".-_~+"
         version = f"@{quote(self.version, safe=version_safe)}" if self.version else ""
         qualifiers = ""
-        if self.ecosystem == "Debian":
+        if deb_family:
             pairs = []
             if self.arch:
                 pairs.append("arch=" + quote(self.arch, safe=""))

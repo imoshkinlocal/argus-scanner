@@ -1,15 +1,18 @@
-"""Debian package metadata: ``debian/control``, dpkg status and ``.deb`` files.
+"""Debian-family package metadata: control files, dpkg status and ``.deb`` files.
 
-Debian has no manifest or lock file in the sense the other parsers expect: the
-declared dependencies live in ``debian/control`` and the resolved ones in the
-dpkg database.  This module covers both directions:
+Debian and Ubuntu have no manifest or lock file in the sense the other parsers
+expect: the declared dependencies live in ``debian/control`` and the resolved
+ones in the dpkg database.  This module covers both directions:
 
 * :func:`parse_control` — build and runtime dependencies of a source package;
 * :func:`parse_status` — installed binary packages from ``var/lib/dpkg/status``;
 * :func:`parse_deb` — metadata of a single binary package.
 
-Versions are Debian versions (``[epoch:]upstream[-revision]``) and are compared
-with the dpkg algorithm from :mod:`argus.sca.versions`.
+Packages carry the OSV ecosystem of their vendor (``Debian`` or ``Ubuntu``) plus
+the release (``bookworm``, ``jammy``) which selects the per-release OSV
+ecosystem (``Debian:12``, ``Ubuntu:22.04:LTS``).  Versions are Debian versions
+(``[epoch:]upstream[-revision]``) and are compared with the dpkg algorithm from
+:mod:`argus.sca.versions`.
 """
 
 from __future__ import annotations
@@ -65,22 +68,37 @@ DEBIAN_RELEASES = {
     "13": "trixie",
     "14": "forky",
 }
+#: Ubuntu releases tracked by OSV, keyed by ``YY.MM``.
+UBUNTU_RELEASES = {
+    "14.04": "trusty",
+    "16.04": "xenial",
+    "18.04": "bionic",
+    "20.04": "focal",
+    "22.04": "jammy",
+    "24.04": "noble",
+    "24.10": "oracular",
+    "25.04": "plucky",
+    "25.10": "questing",
+}
 _CODENAME_RELEASES = {codename: major for major, codename in DEBIAN_RELEASES.items()}
-_RELEASE_RE = re.compile(r"^(?P<major>\d+)(?:\.\d+)*$")
+_UBUNTU_CODENAMES = {codename: release for release, codename in UBUNTU_RELEASES.items()}
+_DEBIAN_RELEASE_RE = re.compile(r"^(?P<major>\d+)(?:\.\d+)*$")
+_UBUNTU_RELEASE_RE = re.compile(r"^(?P<release>\d{2}\.\d{2})$")
 
 
 # --------------------------------------------------------------------------- suites
 
 @dataclass(frozen=True)
 class DebianSuite:
-    """Debian release identity: codename plus the numeric major version.
+    """A Debian-family release: vendor, codename and numeric release.
 
-    OSV publishes Debian advisories per release (``Debian:12``) and Debian
-    packages only carry a suite, so both representations are kept together.
+    OSV publishes advisories per release (``Debian:12``, ``Ubuntu:22.04:LTS``)
+    while packages only carry a suite, so both representations are kept here.
     """
 
     codename: str = ""
     major: str = ""
+    vendor: str = ""
 
     @property
     def known(self) -> bool:
@@ -93,29 +111,68 @@ class DebianSuite:
         return self.codename or self.major
 
     @property
+    def package_ecosystem(self) -> str:
+        """Package ecosystem used by argus (``Debian`` or ``Ubuntu``)."""
+        return "Ubuntu" if self.vendor == "ubuntu" else "Debian"
+
+    @property
     def ecosystem(self) -> str:
-        return f"Debian:{self.major}" if self.major else ""
+        if not self.major:
+            return ""
+        if self.vendor == "ubuntu":
+            suffix = ":LTS" if _is_ubuntu_lts(self.major) else ""
+            return f"Ubuntu:{self.major}{suffix}"
+        return f"Debian:{self.major}"
 
 
-def normalize_suite(value: str) -> DebianSuite:
-    """Turn ``12``, ``12.5``, ``Debian:12`` or ``bookworm`` into a suite."""
+def _is_ubuntu_lts(release: str) -> bool:
+    """Ubuntu LTS releases are the even-year April (``.04``) ones."""
+    year, _, month = release.partition(".")
+    return month == "04" and year.isdigit() and int(year) % 2 == 0
+
+
+def normalize_suite(value: str, vendor: str = "") -> DebianSuite:
+    """Turn ``12``, ``bookworm``, ``22.04`` or ``jammy`` into a suite.
+
+    The vendor is inferred from the value unless it is passed explicitly;
+    ``debian:12`` and ``ubuntu:jammy`` prefixes always win.
+    """
     text = (value or "").strip().lower()
-    if text.startswith("debian:"):
-        text = text[7:]
+    vendor = (vendor or "").strip().lower()
+    if text.startswith("ubuntu:"):
+        vendor, text = "ubuntu", text[7:]
+    elif text.startswith("debian:"):
+        vendor, text = "debian", text[7:]
     if not text:
-        return DebianSuite()
-    match = _RELEASE_RE.match(text)
+        return DebianSuite(vendor=vendor)
+
+    if not vendor:
+        if text in _UBUNTU_CODENAMES or _UBUNTU_RELEASE_RE.match(text):
+            vendor = "ubuntu"
+        else:
+            vendor = "debian"
+
+    if vendor == "ubuntu":
+        match = _UBUNTU_RELEASE_RE.match(text)
+        if match:
+            release = match.group("release")
+            return DebianSuite(UBUNTU_RELEASES.get(release, ""), release, "ubuntu")
+        if text in _UBUNTU_CODENAMES:
+            return DebianSuite(text, _UBUNTU_CODENAMES[text], "ubuntu")
+        return DebianSuite(text, "", "ubuntu")
+
+    match = _DEBIAN_RELEASE_RE.match(text)
     if match:
         major = match.group("major")
-        return DebianSuite(DEBIAN_RELEASES.get(major, ""), major)
+        return DebianSuite(DEBIAN_RELEASES.get(major, ""), major, "debian")
     if text in _CODENAME_RELEASES:
-        return DebianSuite(text, _CODENAME_RELEASES[text])
-    return DebianSuite(text, "")
+        return DebianSuite(text, _CODENAME_RELEASES[text], "debian")
+    return DebianSuite(text, "", "debian")
 
 
-def debian_ecosystem(distro: str) -> str:
+def debian_ecosystem(distro: str, vendor: str = "") -> str:
     """Return the OSV ecosystem (``Debian:12``) for a suite, or ``""``."""
-    return normalize_suite(distro).ecosystem
+    return normalize_suite(distro, vendor).ecosystem
 
 
 def _read_small(path: str) -> str:
@@ -143,41 +200,47 @@ def _suite_from_debian_version(text: str) -> DebianSuite:
     if not stripped:
         return DebianSuite()
     first = stripped.splitlines()[0].strip()
-    suite = normalize_suite(first)
+    suite = normalize_suite(first, "debian")
     if suite.known:
         return suite
     # Unstable images report ``bookworm/sid`` or ``trixie/sid``.
     if "/" in first:
-        return normalize_suite(first.split("/", 1)[0])
+        return normalize_suite(first.split("/", 1)[0], "debian")
     return DebianSuite()
 
 
 def _suite_from_os_release(fields: Dict[str, str]) -> DebianSuite:
+    identifier = fields.get("id", "").lower()
+    id_like = fields.get("id_like", "").lower().split()
+    if identifier == "ubuntu" or "ubuntu" in id_like:
+        for key in ("ubuntu_codename", "version_codename"):
+            suite = normalize_suite(fields.get(key, ""), "ubuntu")
+            if suite.known:
+                return suite
+        return normalize_suite(fields.get("version_id", ""), "ubuntu")
     for key in ("debian_codename", "version_codename"):
-        suite = normalize_suite(fields.get(key, ""))
+        suite = normalize_suite(fields.get(key, ""), "debian")
         if suite.known:
             return suite
-    suite = normalize_suite(fields.get("version_id", ""))
+    suite = normalize_suite(fields.get("version_id", ""), "debian")
     if suite.known:
         return suite
     # A Debian derivative should still expose the base release in VERSION_ID.
-    identifier = (fields.get("id", "") + " " + fields.get("id_like", "")).lower()
-    if "debian" in identifier.split():
-        return normalize_suite(fields.get("version_id", ""))
+    identifier_text = (fields.get("id", "") + " " + " ".join(id_like)).lower()
+    if "debian" in identifier_text.split():
+        return normalize_suite(fields.get("version_id", ""), "debian")
     return DebianSuite()
 
 
 def detect_suite(root: Optional[str] = None) -> DebianSuite:
-    """Detect the Debian release of ``root`` (a rootfs) or of the host.
+    """Detect the Debian/Ubuntu release of ``root`` (a rootfs) or the host.
 
-    ``/etc/debian_version`` wins because it is authoritative on Debian itself;
-    ``os-release`` is the fallback for minimal images.  An empty result means
-    the release is unknown and Debian advisories cannot be matched safely.
+    ``os-release`` is read first because Ubuntu also ships a
+    ``/etc/debian_version`` that names its Debian base.  For Debian systems the
+    numeric ``/etc/debian_version`` stays the authoritative fallback.  An empty
+    result means the release is unknown and advisories cannot be matched safely.
     """
     base = os.path.abspath(root) if root else os.sep
-    suite = _suite_from_debian_version(_read_small(os.path.join(base, "etc", "debian_version")))
-    if suite.known:
-        return suite
     for candidate in ("etc/os-release", "usr/lib/os-release"):
         fields = _os_release_fields(_read_small(os.path.join(base, candidate)))
         if not fields:
@@ -185,7 +248,8 @@ def detect_suite(root: Optional[str] = None) -> DebianSuite:
         suite = _suite_from_os_release(fields)
         if suite.known:
             return suite
-    return DebianSuite()
+    suite = _suite_from_debian_version(_read_small(os.path.join(base, "etc", "debian_version")))
+    return suite
 
 
 # --------------------------------------------------------------------------- deb822
@@ -255,13 +319,15 @@ def _relation_version(operator: str, version: str, policy: str) -> Tuple[str, st
 
 
 def _dependency_package(rel: str, name: str, version: str, scope: str,
-                        assumed: bool, parser: str) -> Package:
-    return Package(name=name, version=version, ecosystem="Debian", manifest=rel,
+                        assumed: bool, parser: str,
+                        ecosystem: str = "Debian") -> Package:
+    return Package(name=name, version=version, ecosystem=ecosystem, manifest=rel,
                    scope=scope, parser=parser, assumed=assumed, direct=True)
 
 
 def _append_dependencies(result: ParseResult, rel: str, value: str, scope: str,
-                         policy: str, parser: str) -> None:
+                         policy: str, parser: str,
+                         ecosystem: str = "Debian") -> None:
     for item in _split_relations(value):
         parsed = _parse_relation(item)
         if parsed is None:
@@ -274,7 +340,7 @@ def _append_dependencies(result: ParseResult, rel: str, value: str, scope: str,
             result.skipped.append(SkippedDep(name, "range", rel))
             continue
         result.packages.append(_dependency_package(
-            rel, name, version, scope, bool(reason), parser))
+            rel, name, version, scope, bool(reason), parser, ecosystem))
 
 
 def _merge_duplicates(packages: Iterable[Package]) -> List[Package]:
@@ -298,7 +364,7 @@ def _merge_duplicates(packages: Iterable[Package]) -> List[Package]:
 # --------------------------------------------------------------------------- debian/control
 
 def parse_control(text: str, rel: str = "debian/control",
-                  range_policy: str = "min") -> ParseResult:
+                  range_policy: str = "min", ecosystem: str = "Debian") -> ParseResult:
     """Parse a ``debian/control`` file into build and runtime dependencies."""
     result = ParseResult()
     for stanza in stanzas(text):
@@ -306,11 +372,11 @@ def parse_control(text: str, rel: str = "debian/control",
             # A binary package stanza declares its runtime dependencies only.
             for field_name, scope in DEPENDENCY_FIELDS[3:]:
                 _append_dependencies(result, rel, stanza.get(field_name, ""), scope,
-                                     range_policy, "debian-control")
+                                     range_policy, "debian-control", ecosystem)
         elif stanza.get("source"):
             for field_name, scope in DEPENDENCY_FIELDS[:3]:
                 _append_dependencies(result, rel, stanza.get(field_name, ""), scope,
-                                     range_policy, "debian-control")
+                                     range_policy, "debian-control", ecosystem)
     result.packages = _merge_duplicates(result.packages)
     return result
 
@@ -355,7 +421,7 @@ def _read_text(path: str) -> str:
 
 
 def parse_status(text: str, rel: str = "var/lib/dpkg/status",
-                 distro: str = "") -> ParseResult:
+                 distro: str = "", ecosystem: str = "Debian") -> ParseResult:
     """Parse a dpkg status file and keep the installed binary packages."""
     result = ParseResult()
     packages: List[Package] = []
@@ -378,7 +444,7 @@ def parse_status(text: str, rel: str = "var/lib/dpkg/status",
         packages.append(Package(
             name=name,
             version=version,
-            ecosystem="Debian",
+            ecosystem=ecosystem,
             manifest=rel,
             scope="runtime",
             parser="dpkg-status",
@@ -392,13 +458,14 @@ def parse_status(text: str, rel: str = "var/lib/dpkg/status",
     return result
 
 
-def parse_status_file(path: str, distro: str = "") -> ParseResult:
+def parse_status_file(path: str, distro: str = "",
+                      ecosystem: str = "Debian") -> ParseResult:
     """Read and parse a dpkg status file; returns an issue on failure."""
     try:
         text = _read_text(path)
     except (OSError, ValueError) as exc:
         return ParseResult(issues=[f"{path}: {exc}"])
-    return parse_status(text, rel=path, distro=distro)
+    return parse_status(text, rel=path, distro=distro, ecosystem=ecosystem)
 
 
 # --------------------------------------------------------------------------- .deb files
@@ -465,7 +532,8 @@ def read_deb_control(path: str) -> str:
     return text or _control_pure(path)
 
 
-def parse_deb(path: str, distro: str = "") -> ParseResult:
+def parse_deb(path: str, distro: str = "",
+              ecosystem: str = "Debian") -> ParseResult:
     """Parse a binary ``.deb``: the package itself plus its declared dependencies."""
     rel = path
     try:
@@ -481,7 +549,7 @@ def parse_deb(path: str, distro: str = "") -> ParseResult:
     if not name or not version:
         return ParseResult(issues=[f"{path}: control file has no Package or Version"])
     arch = stanza.get("architecture", "")
-    package = Package(name=name, version=version, ecosystem="Debian", manifest=rel,
+    package = Package(name=name, version=version, ecosystem=ecosystem, manifest=rel,
                       scope="runtime", parser="deb", direct=True, arch=arch,
                       distro=distro)
     result = ParseResult(packages=[package])
@@ -489,7 +557,7 @@ def parse_deb(path: str, distro: str = "") -> ParseResult:
     for field_name, scope in DEPENDENCY_FIELDS[3:]:
         before = len(result.packages)
         _append_dependencies(result, rel, stanza.get(field_name, ""), scope,
-                             "min", "deb")
+                             "min", "deb", ecosystem)
         dependencies.extend(result.packages[before:])
     for dependency in dependencies:
         dependency.direct = False
@@ -533,12 +601,12 @@ def _status_root(path: str) -> str:
 
 def collect(deb_roots: Sequence[str] = (), status_files: Sequence[str] = (),
             deb_files: Sequence[str] = (), suite: str = "") -> DebianInventory:
-    """Collect Debian packages from roots, status files and ``.deb`` archives.
+    """Collect Debian-family packages from roots, status files and ``.deb`` archives.
 
     The suite is detected per rootfs; an explicit ``suite`` (``--deb-suite``)
     overrides detection.  A standalone status file or a ``.deb`` archive has no
     rootfs of its own, so only an explicit suite is trusted there: guessing the
-    host release could match advisories of the wrong Debian release.
+    host release could match advisories of the wrong release.
     """
     inventory = DebianInventory()
     explicit = normalize_suite(suite)
@@ -548,15 +616,14 @@ def collect(deb_roots: Sequence[str] = (), status_files: Sequence[str] = (),
         if not os.path.isfile(status):
             inventory.issues.append(f"{root}: no dpkg status file at {status}")
             continue
-        root_suite = detect_suite(root)
-        if not root_suite.known:
-            root_suite = explicit
+        root_suite = explicit if explicit.known else detect_suite(root)
         if not root_suite.known:
             inventory.issues.append(
-                f"{root}: cannot determine the Debian suite for {status}; "
-                "use --deb-suite (for example --deb-suite bookworm)"
+                f"{root}: cannot determine the Debian/Ubuntu suite for {status}; "
+                "use --deb-suite (for example --deb-suite bookworm or jammy)"
             )
-        inventory.add(parse_status_file(status, distro=root_suite.label), status)
+        inventory.add(parse_status_file(status, distro=root_suite.label,
+                                        ecosystem=root_suite.package_ecosystem), status)
     for path in status_files:
         suite_for_file = explicit
         if not suite_for_file.known:
@@ -565,13 +632,15 @@ def collect(deb_roots: Sequence[str] = (), status_files: Sequence[str] = (),
                 suite_for_file = detect_suite(root)
         if not suite_for_file.known:
             inventory.issues.append(
-                f"{path}: cannot determine the Debian suite; use --deb-suite"
+                f"{path}: cannot determine the Debian/Ubuntu suite; use --deb-suite"
             )
-        inventory.add(parse_status_file(path, distro=suite_for_file.label), path)
+        inventory.add(parse_status_file(path, distro=suite_for_file.label,
+                                        ecosystem=suite_for_file.package_ecosystem), path)
     for path in deb_files:
         if not explicit.known:
             inventory.issues.append(
-                f"{path}: cannot determine the Debian suite; use --deb-suite"
+                f"{path}: cannot determine the Debian/Ubuntu suite; use --deb-suite"
             )
-        inventory.add(parse_deb(path, distro=explicit.label), path)
+        inventory.add(parse_deb(path, distro=explicit.label,
+                                ecosystem=explicit.package_ecosystem), path)
     return inventory

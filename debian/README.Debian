@@ -51,7 +51,7 @@ On a machine with network access, prepare wheels for the target platform
 
 Then either pass the directory to the package manager:
 
-  sudo ARGUS_WHEELHOUSE=/media/wheels apt install ./argus-scanner_1.2.0-1_all.deb
+  sudo ARGUS_WHEELHOUSE=/media/wheels apt install ./argus-scanner_1.3.0-1_all.deb
 
 or write the directory into the first line of /etc/argus-scanner/wheelhouse
 and install normally.  The runtime can also be rebuilt afterwards:

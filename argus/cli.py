@@ -107,14 +107,14 @@ def _add_sast_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_debian_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--deb-root", action="append", default=[], metavar="DIR",
-                        help="read installed packages from DIR/var/lib/dpkg/status "
-                             "(repeatable; use / for the running system)")
+                        help="read installed Debian/Ubuntu packages from "
+                             "DIR/var/lib/dpkg/status (repeatable; use / for the host)")
     parser.add_argument("--deb-status", action="append", default=[], metavar="FILE",
                         help="read a dpkg status file (repeatable)")
     parser.add_argument("--deb", action="append", default=[], metavar="FILE",
                         help="inspect a binary .deb package (repeatable)")
     parser.add_argument("--deb-suite", default="", metavar="SUITE",
-                        help="Debian suite/codename (for example bookworm or 12) for "
+                        help="Debian/Ubuntu release (bookworm, jammy, 12, 22.04) for "
                              "--deb/--deb-status and debian/control; "
                              "default: detect from the rootfs or the host")
 
@@ -795,7 +795,9 @@ def build_parser() -> argparse.ArgumentParser:
     db = subparsers.add_parser("db", help="offline OSV database management")
     db_sub = db.add_subparsers(dest="db_command")
     db_update = db_sub.add_parser("update", help="download per-ecosystem OSV archives")
-    db_update.add_argument("--ecosystem", action="append", default=[])
+    db_update.add_argument("--ecosystem", action="append", default=[],
+                           help="ecosystem to download (repeatable), for example "
+                                "Debian or Ubuntu; default: all small ecosystems")
     db_update.add_argument("--db-dir")
     db_update.add_argument("-q", "--quiet", action="store_true")
     db_update.set_defaults(func=command_db_update)

@@ -93,7 +93,7 @@ def test_spdx_document_shape(ruby_project, inventory, metadata):
     assert document["SPDXID"] == "SPDXRef-DOCUMENT"
     assert document["name"] == "demo-sbom"
     assert document["documentNamespace"].startswith("https://argus.local/spdx/")
-    assert document["creationInfo"]["creators"] == ["Tool: argus-1.2.0"]
+    assert document["creationInfo"]["creators"] == ["Tool: argus-1.3.0"]
 
 
 def test_spdx_packages_use_purl_external_refs(ruby_project, inventory, metadata):

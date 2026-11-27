@@ -25,6 +25,12 @@ PACKAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FAIL_ON_CHOICES = ("high", "critical", "medium", "low", "info", "none")
 RANGE_CHOICES = ("min", "skip")
+#: Releases accepted by ``--deb-suite``; free text stays allowed for others.
+DEB_SUITE_CHOICES = (
+    "bookworm", "bullseye", "trixie", "stretch", "buster", "forky",
+    "jammy", "noble", "focal", "bionic", "xenial", "oracular", "plucky",
+    "12", "11", "13", "10", "9", "22.04", "24.04", "20.04",
+)
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info", "unknown")
 _SEVERITY_PRIORITY = {name: len(SEVERITY_ORDER) - index
                       for index, name in enumerate(SEVERITY_ORDER)}
@@ -168,6 +174,7 @@ argus — SAST + SCA сканер
 • Секреты — ключи, токены, приватные ключи и пароли в коде (CWE-798).
 • IaC — Dockerfile, Kubernetes-манифесты и Terraform (CWE-16/CWE-250).
 • SCA — поиск уязвимых версий зависимостей по базе OSV.dev (CVE, GHSA).
+  Для Debian/Ubuntu дополнительно читаются debian/control, dpkg-статус и .deb.
 
 КАК ПОЛЬЗОВАТЬСЯ
 1. Выберите каталог с исходниками кнопкой «Выбрать каталог…». Проверяется весь каталог
@@ -224,6 +231,22 @@ argus — SAST + SCA сканер
 • Quality gates из [gates]/[policies] (max_total, max_by_severity,
   deny_packages, deny_cwes, max_cvss, deny_licenses) печатаются в журнале;
   нарушение даёт код 1.
+
+DEBIAN / UBUNTU (SCA)
+• Блок «2b · Пакеты Debian/Ubuntu»:
+  «Корень системы» (--deb-root) читает <корень>/var/lib/dpkg/status и сам
+  определяет релиз из /etc/os-release или /etc/debian_version; «/» — текущая система.
+  «Статус dpkg» (--deb-status) и «Файлы .deb» (--deb, через запятую) не знают
+  релиз, поэтому для них укажите «Релиз» (--deb-suite): bookworm, jammy, 12, 22.04.
+• Без релиза такие пакеты пропускаются с предупреждением: OSV публикует
+  Debian- и Ubuntu-советники по релизам (Debian:12, Ubuntu:22.04:LTS), и чужая
+  ветка дала бы неверные «исправленные» версии.
+• Зависимости из debian/control получают релиз из debian/changelog (поле
+  distribution) или из явного --deb-suite. В отчётах и SBOM у Debian-пакетов
+  есть свойства argus:deb-distro и argus:deb-arch, purl вида
+  pkg:deb/debian/… или pkg:deb/ubuntu/….
+• Офлайн-база: `argus db update --ecosystem Debian` (~85 МБ) или
+  `argus db update --ecosystem Ubuntu` (~800 МБ, включает все релизы).
 
 THREAT INTELLIGENCE
 • SCA-находки можно обогатить EPSS (вероятность эксплуатации) и CISA KEV
@@ -295,6 +318,9 @@ VEX — командой `argus vex`, сравнение отчётов — `arg
   устаревший. Локальные --epss-file/--kev-file нужно обновлять самостоятельно.
 • SBOM содержит только те лицензии и хэши, которые объявлены в lock-файлах;
   остальное остаётся пустым / NOASSERTION.
+• Debian/Ubuntu: советники OSV привязаны к релизу; без --deb-suite (или
+  rootfs/changelog) пакеты пропускаются. Ubuntu Pro/ESM-советники
+  (Ubuntu:Pro:…) не запрашиваются — определяется только базовый релиз.
 • Срабатывание — повод для проверки, а не окончательный вердикт.
 """
 
@@ -318,6 +344,10 @@ def build_scan_command(
     iac: bool = True,
     include_suppressed: bool = False,
     context_lines: int = 2,
+    deb_roots: Sequence[str] = (),
+    deb_status: Sequence[str] = (),
+    deb_files: Sequence[str] = (),
+    deb_suite: Optional[str] = None,
 ) -> List[str]:
     """Return the ``argus scan`` argument vector for the given GUI options."""
     command = [sys.executable, "-m", "argus.cli", "scan", target,
@@ -351,6 +381,14 @@ def build_scan_command(
         command += ["--context-lines", str(context_lines)]
     for pattern in excludes:
         command += ["--exclude", pattern]
+    for root in deb_roots:
+        command += ["--deb-root", root]
+    for status in deb_status:
+        command += ["--deb-status", status]
+    for archive in deb_files:
+        command += ["--deb", archive]
+    if deb_suite:
+        command += ["--deb-suite", deb_suite]
     return command
 
 
@@ -683,6 +721,10 @@ class ArgusApp(tk.Tk):
         self.fail_new_var = tk.BooleanVar(value=False)
         self.secrets_var = tk.BooleanVar(value=True)
         self.iac_var = tk.BooleanVar(value=True)
+        self.deb_root_var = tk.StringVar()
+        self.deb_status_var = tk.StringVar()
+        self.deb_var = tk.StringVar()
+        self.deb_suite_var = tk.StringVar()
         self.filter_var = tk.StringVar()
         self.kind_filter_var = tk.StringVar(value="all")
         self.cwe_filter_var = tk.StringVar(value="all")
@@ -916,6 +958,55 @@ class ArgusApp(tk.Tk):
                   "для SCA glob по манифесту. Конфиг и baseline можно не указывать — "
                   "argus найдёт argus.toml рядом с проектом."),
         ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+
+        debian = ttk.LabelFrame(
+            parent, text="2b · Пакеты Debian/Ubuntu (dpkg и .deb)",
+            style="Options.TLabelframe", padding=10)
+        debian.pack(fill="x", pady=(10, 0))
+        debian.columnconfigure(1, weight=1)
+        ttk.Label(debian, text="Корень системы:", style="Card.TLabel").grid(
+            row=0, column=0, sticky="e")
+        ttk.Entry(debian, textvariable=self.deb_root_var).grid(
+            row=0, column=1, sticky="ew", padx=6)
+        ttk.Button(debian, text="Выбрать…", width=10,
+                   command=lambda: self._pick_directory(
+                       self.deb_root_var, "Корень системы (/) или chroot")).grid(
+            row=0, column=2)
+        ttk.Label(debian, text="Статус dpkg:", style="Card.TLabel").grid(
+            row=1, column=0, sticky="e", pady=(6, 0))
+        ttk.Entry(debian, textvariable=self.deb_status_var).grid(
+            row=1, column=1, sticky="ew", padx=6, pady=(6, 0))
+        ttk.Button(debian, text="Выбрать…", width=10,
+                   command=lambda: self._pick_file(
+                       self.deb_status_var, "Файл var/lib/dpkg/status",
+                       [("Статус dpkg", "status"), ("Все файлы", "*")])).grid(
+            row=1, column=2, pady=(6, 0))
+        ttk.Label(debian, text="Файлы .deb:", style="Card.TLabel").grid(
+            row=2, column=0, sticky="e", pady=(6, 0))
+        ttk.Entry(debian, textvariable=self.deb_var).grid(
+            row=2, column=1, sticky="ew", padx=6, pady=(6, 0))
+        ttk.Button(debian, text="Выбрать…", width=10,
+                   command=lambda: self._pick_files(
+                       self.deb_var, "Пакеты .deb",
+                       [("Debian-пакеты", "*.deb"), ("Все файлы", "*")])).grid(
+            row=2, column=2, pady=(6, 0))
+        ttk.Label(debian, text="Релиз:", style="Card.TLabel").grid(
+            row=3, column=0, sticky="e", pady=(6, 0))
+        suite_row = ttk.Frame(debian, style="Card.TFrame")
+        suite_row.grid(row=3, column=1, columnspan=2, sticky="w", padx=6, pady=(6, 0))
+        ttk.Combobox(suite_row, textvariable=self.deb_suite_var,
+                     values=DEB_SUITE_CHOICES, width=14).pack(side="left")
+        ttk.Label(suite_row, style="CardMuted.TLabel",
+                  text="— --deb-suite; нужен для .deb и отдельных status-файлов, "
+                       "для корня системы определяется сам").pack(side="left", padx=(8, 0))
+        ttk.Label(
+            debian, style="CardMuted.TLabel", wraplength=1000, justify="left",
+            text=("Корень системы читает <корень>/var/lib/dpkg/status и определяет "
+                  "Debian/Ubuntu-релиз из /etc/os-release или /etc/debian_version. "
+                  "Отдельные .deb и status-файлы не знают релиз: укажите его в поле "
+                  "«Релиз» (bookworm, jammy, 12, 22.04). Без релиза пакет пропускается "
+                  "с предупреждением — иначе можно получить чужие исправления."),
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
         output = ttk.LabelFrame(parent, text="3 · Куда сохранить отчёты",
                                 style="Output.TLabelframe", padding=10)
@@ -1278,6 +1369,18 @@ class ArgusApp(tk.Tk):
         if chosen:
             variable.set(chosen)
 
+    def _pick_files(self, variable: tk.StringVar, title: str,
+                    filetypes: Sequence[Tuple[str, str]]) -> None:
+        chosen = filedialog.askopenfilenames(title=title, filetypes=list(filetypes))
+        if chosen:
+            variable.set(", ".join(chosen))
+
+    def _pick_directory(self, variable: tk.StringVar, title: str) -> None:
+        initial = variable.get().strip() or os.getcwd()
+        chosen = filedialog.askdirectory(title=title, initialdir=initial, mustexist=True)
+        if chosen:
+            variable.set(chosen)
+
     def _pick_save(self, variable: tk.StringVar, extension: str) -> None:
         chosen = filedialog.asksaveasfilename(
             title="Куда сохранить отчёт", defaultextension=f".{extension}",
@@ -1365,7 +1468,14 @@ class ArgusApp(tk.Tk):
             fail_on=self.fail_var.get(), range_policy=self.range_var.get(),
             excludes=excludes, config=self.config_var.get().strip() or None,
             baseline=baseline, fail_on_new=self.fail_new_var.get(),
-            secrets=self.secrets_var.get(), iac=self.iac_var.get())
+            secrets=self.secrets_var.get(), iac=self.iac_var.get(),
+            deb_roots=[self.deb_root_var.get().strip()]
+            if self.deb_root_var.get().strip() else [],
+            deb_status=[self.deb_status_var.get().strip()]
+            if self.deb_status_var.get().strip() else [],
+            deb_files=[item.strip() for item in self.deb_var.get().split(",")
+                       if item.strip()],
+            deb_suite=self.deb_suite_var.get().strip() or None)
 
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(
