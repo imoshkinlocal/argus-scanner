@@ -3,6 +3,36 @@
 Все заметные изменения проекта. Формат — по мотивам Keep a Changelog,
 версии — [SemVer](https://semver.org/lang/ru/).
 
+## [1.4.0] — 2026-11-27
+
+### Добавлено
+
+- OWASP Top 10 для находок: CWE сопоставляется с категорией `A01…A10`
+  выбранной редакции. Встроены **2017**, **2021** (по умолчанию) и **2025**;
+  один CWE может относиться к нескольким категориям (CWE-259 → A02:2021 и
+  A07:2021), поэтому `Finding.owasp` — список.
+- Флаги `--owasp-version`, `--owasp-file` и `--no-owasp` для `scan`, `sast` и
+  `sca`; настройки `owasp`, `owasp_version`, `owasp_file` в `[scan]`/`[report]`.
+- Команда `argus owasp [CWE...]` — список категорий редакции или маппинг
+  запрошенных CWE, форматы text/Markdown/JSON (`--version`, `--file`, `-f`, `-o`).
+- Справочник вынесен в данные: `argus/owasp_top10.json` (+ package-data) и
+  генератор `scripts/update_owasp.py` с `--check` и `--repo-dir`; обновление
+  из официального `OWASP/Top10` не требует правки кода.
+- Отчёты: JSON (`finding.owasp`, `summary.by_owasp`, `summary.owasp_version`,
+  `stats.workflow.owasp`), text (`owasp:` и строка сводки), Markdown (колонка
+  OWASP и секция `## OWASP Top 10`), SARIF (теги `owasp/aNN-YYYY` и поля
+  `owasp`/`owasp_name`/`owasp_url`).
+- GUI: переключатель OWASP, выбор редакции и своего файла в окне сканирования;
+  категории в деталях находки и распределение в сводке; раздел в справке.
+- `tests/test_owasp.py` плюс проверки в `test_cli`, `test_config`, `test_gui`,
+  `test_output`, `test_workflow` и `test_threat`.
+
+### Изменено
+
+- Обогащение workflow теперь включает OWASP после CWE и до remediation;
+  `stats.workflow.owasp` хранит редакцию и число сопоставленных находок.
+- Версия поднята до 1.4.0 (portable, wheel, `.deb`, man-страницы, SBOM).
+
 ## [1.3.0] — 2026-11-27
 
 ### Добавлено
@@ -112,6 +142,7 @@
 - `argus-scanner_1.1.0-3` — универсальный пакет без вендоринга.
 - `argus-scanner_1.1.0-4` — исправление TOML на Python 3.10 (`tomli`).
 
+[1.4.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.4.0
 [1.3.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.3.0
 [1.2.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.2.0
 [1.1.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.1.0

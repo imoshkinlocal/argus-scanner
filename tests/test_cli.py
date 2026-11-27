@@ -125,6 +125,56 @@ def test_sast_markdown_format(vulnerable_file, capsys):
     assert "## SAST findings" in output
 
 
+def test_sast_attaches_owasp_mapping(vulnerable_file, capsys):
+    code = main(["sast", vulnerable_file, "--engine", "java", "-f", "json",
+                 "--fail-on", "none", "-q"])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == EXIT_OK
+    finding = payload["findings"][0]
+    assert finding["owasp"][0]["id"] == "A03:2021"
+    assert finding["owasp"][0]["name_ru"] == "Инъекции"
+    assert payload["summary"]["by_owasp"] == {"A03:2021": 1}
+    assert payload["summary"]["owasp_version"] == "2021"
+    assert payload["stats"]["workflow"]["owasp"] == {"version": "2021", "mapped": 1}
+
+
+def test_sast_owasp_version_and_disable(vulnerable_file, capsys):
+    assert main(["sast", vulnerable_file, "--engine", "java", "-f", "json",
+                 "--fail-on", "none", "-q", "--owasp-version", "2025"]) == EXIT_OK
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["summary"]["by_owasp"] == {"A05:2025": 1}
+    assert payload["summary"]["owasp_version"] == "2025"
+
+    assert main(["sast", vulnerable_file, "--engine", "java", "-f", "json",
+                 "--fail-on", "none", "-q", "--no-owasp"]) == EXIT_OK
+    payload = json.loads(capsys.readouterr().out)
+    assert "owasp" not in payload["findings"][0]
+    assert payload["summary"]["by_owasp"] == {}
+    assert payload["summary"]["owasp_version"] == ""
+
+
+def test_sast_owasp_file_uses_the_file_edition(vulnerable_file, tmp_path, capsys):
+    mapping = tmp_path / "mapping.json"
+    mapping.write_text(json.dumps({
+        "version": "2029", "categories": [
+            {"id": "A01", "name": "Custom", "name_ru": "Своя", "cwes": [89]}]}),
+        encoding="utf-8")
+    code = main(["sast", vulnerable_file, "--engine", "java", "-f", "json",
+                 "--fail-on", "none", "-q", "--owasp-file", str(mapping)])
+    payload = json.loads(capsys.readouterr().out)
+    assert code == EXIT_OK
+    assert payload["findings"][0]["owasp"][0]["id"] == "A01:2029"
+    assert payload["summary"]["owasp_version"] == "2029"
+
+
+def test_sast_owasp_file_missing_is_exit_2(vulnerable_file, tmp_path, capsys):
+    code = main(["sast", vulnerable_file, "--engine", "java", "-f", "json",
+                 "--fail-on", "none", "-q",
+                 "--owasp-file", str(tmp_path / "nope.json")])
+    assert code == EXIT_ERROR
+    assert "OWASP mapping not found" in capsys.readouterr().err
+
+
 def test_missing_target_is_exit_2(tmp_path, capsys):
     code = main(["sast", str(tmp_path / "nope"), "--engine", "java", "-q"])
     captured = capsys.readouterr()

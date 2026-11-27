@@ -106,6 +106,8 @@ def _rule(finding: Finding) -> Dict[str, Any]:
     tags = ["security"]
     if finding.cwe:
         tags.append(finding.cwe.lower().replace("cwe-", "cwe/"))
+    for category in finding.owasp:
+        tags.append(f"owasp/{category.label.lower().replace(':', '-')}")
     rule: Dict[str, Any] = {
         "id": finding.rule_id,
         "name": finding.rule_id.replace("-", "_"),
@@ -191,6 +193,15 @@ def sarif_report(result: ScanResult, root: str) -> Dict[str, Any]:
             sarif_result["properties"]["cwe"] = finding.cwe
         if finding.cwe_name:
             sarif_result["properties"]["cwe_name"] = finding.cwe_name
+        if finding.owasp:
+            sarif_result["properties"]["owasp"] = [
+                category.label for category in finding.owasp]
+            sarif_result["properties"]["owasp_name"] = [
+                category.name for category in finding.owasp]
+            first_url = next((category.url for category in finding.owasp
+                              if category.url), "")
+            if first_url:
+                sarif_result["properties"]["owasp_url"] = first_url
         if finding.remediation:
             sarif_result["properties"]["remediation"] = list(finding.remediation)
         if finding.suggested_fix and finding.start_line:
@@ -309,6 +320,9 @@ def text_report(result: ScanResult, color: bool = False, max_items: int = 0) -> 
         if finding.cwe:
             label = f" ({finding.cwe_name})" if finding.cwe_name else ""
             lines.append(f"    cwe: {finding.cwe}{label}")
+        if finding.owasp:
+            lines.append("    owasp: " + ", ".join(
+                category.display for category in finding.owasp))
         message = (finding.message or finding.title).strip().replace("\n", " ")
         if len(message) > 400:
             message = message[:397] + "..."
@@ -345,6 +359,10 @@ def text_report(result: ScanResult, color: bool = False, max_items: int = 0) -> 
         extra += f", new: {summary['new']}"
     lines.append("Summary: " + ", ".join(parts)
                  + f", total: {summary['total']}{extra}")
+    if summary.get("by_owasp"):
+        edition = summary.get("owasp_version") or ""
+        lines.append(f"OWASP Top 10 {edition}: " + ", ".join(
+            f"{label} ×{count}" for label, count in summary["by_owasp"].items()))
     for error in result.errors:
         lines.append(f"warning [{error.scanner}] {error.message}")
     return "\n".join(lines)
@@ -366,6 +384,11 @@ def _cwe_label(finding: Finding) -> str:
     if finding.cwe_name:
         return f"{finding.cwe} {finding.cwe_name}"
     return finding.cwe
+
+
+def _owasp_label(finding: Finding) -> str:
+    """Compact ``A03:2021`` list for report tables."""
+    return ", ".join(category.label for category in finding.owasp)
 
 
 def _epss_label(finding: Finding) -> str:
@@ -444,6 +467,29 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
         f"| Scan errors | {summary['errors']} |",
         "",
     ])
+    if summary.get("by_owasp"):
+        names = {}
+        for finding in result.findings:
+            for category in finding.owasp:
+                names.setdefault(category.label, category)
+        edition = summary.get("owasp_version") or ""
+        lines.extend([
+            "## OWASP Top 10",
+            "",
+            f"Edition: **{edition or '—'}**",
+            "",
+            "| Category | Name | Findings |",
+            "| --- | --- | ---: |",
+        ])
+        for label, count in summary["by_owasp"].items():
+            category = names.get(label)
+            name = ""
+            if category is not None:
+                name = category.name_ru or category.name
+                if category.url:
+                    label = f"[{label}]({category.url})"
+            lines.append(f"| {_md_cell(label)} | {_md_cell(name)} | {count} |")
+        lines.append("")
     if summary["top_rules"]:
         lines.extend([
             "## Rules that fired",
@@ -471,8 +517,8 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
         lines.extend([
             "## SAST findings",
             "",
-            "| Severity | Rule | CWE | Location | Engine | Message |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Severity | Rule | CWE | OWASP | Location | Engine | Message |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ])
         for finding in sast:
             rule = _md_cell(finding.rule_id)
@@ -480,6 +526,7 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
                 rule += " **new**"
             lines.append(
                 f"| {finding.severity.value} | `{rule}` | {_md_cell(_cwe_label(finding))} | "
+                f"{_md_cell(_owasp_label(finding))} | "
                 f"`{_md_cell(finding.location or '-')}` | {_md_cell(finding.engine)} | "
                 f"{_md_cell(finding.message or finding.title, 200)} |"
             )
@@ -488,8 +535,8 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
         lines.extend([
             "## SCA findings",
             "",
-            "| Severity | Advisory | CWE | EPSS | KEV | Package | Installed | Fixed | Manifest |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| Severity | Advisory | CWE | OWASP | EPSS | KEV | Package | Installed | Fixed | Manifest |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
         for finding in sca:
             rule = _md_cell(finding.rule_id)
@@ -497,6 +544,7 @@ def markdown_report(result: ScanResult, title: str = "argus report") -> str:
                 rule += " **new**"
             lines.append(
                 f"| {finding.severity.value} | `{rule}` | {_md_cell(_cwe_label(finding))} | "
+                f"{_md_cell(_owasp_label(finding))} | "
                 f"{_epss_label(finding)} | {_kev_label(finding)} | "
                 f"{_md_cell(finding.package)} | {_md_cell(finding.version)} | "
                 f"{_md_cell(finding.fixed_version or '-')} | "

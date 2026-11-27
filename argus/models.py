@@ -11,7 +11,7 @@ import posixpath
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 TOOL_NAME = "argus"
-TOOL_VERSION = "1.3.0"
+TOOL_VERSION = "1.4.0"
 TOOL_URL = "https://example.invalid/argus"
 
 
@@ -97,6 +97,49 @@ def normalize_path(path: str, root: str) -> str:
     return relative.replace(os.sep, "/")
 
 
+@dataclasses.dataclass(frozen=True)
+class OwaspCategory:
+    """One OWASP Top 10 category attached to a finding.
+
+    The mapping itself lives in :mod:`argus.owasp`; a finding only keeps the
+    categories its CWE resolves to, with the official and Russian names so a
+    report can be rendered without loading the catalog again.
+    """
+
+    id: str
+    version: str
+    name: str = ""
+    name_ru: str = ""
+    url: str = ""
+    cwes: Tuple[int, ...] = ()
+
+    @property
+    def label(self) -> str:
+        """``A03:2021`` — the compact identifier used in reports."""
+        return f"{self.id}:{self.version}"
+
+    @property
+    def display(self) -> str:
+        return f"{self.label} {self.name}".strip()
+
+    @property
+    def display_ru(self) -> str:
+        return f"{self.label} {self.name_ru or self.name}".strip()
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialise one reference for the JSON report (no CWE list)."""
+        payload: Dict[str, Any] = {
+            "id": self.label,
+            "version": self.version,
+            "name": self.name,
+        }
+        if self.name_ru:
+            payload["name_ru"] = self.name_ru
+        if self.url:
+            payload["url"] = self.url
+        return payload
+
+
 @dataclasses.dataclass
 class Finding:
     """A single security issue produced by either engine."""
@@ -116,6 +159,8 @@ class Finding:
     cwe: str = ""
     cwe_name: str = ""
     cwe_name_ru: str = ""
+    #: OWASP Top 10 categories the CWE resolves to for the selected edition.
+    owasp: List[OwaspCategory] = dataclasses.field(default_factory=list)
     confidence: str = "medium"  # low | medium | high
     package: str = ""
     version: str = ""
@@ -190,6 +235,8 @@ class Finding:
             payload["cwe_name"] = self.cwe_name
         if self.cwe_name_ru:
             payload["cwe_name_ru"] = self.cwe_name_ru
+        if self.owasp:
+            payload["owasp"] = [category.to_dict() for category in self.owasp]
         if self.description:
             payload["description"] = self.description
         if self.remediation:
@@ -300,9 +347,14 @@ class ScanResult:
         active = self.active_findings()
         suppressed = len(self.findings) - len(active)
         by_engine: Dict[str, int] = {}
+        by_owasp: Dict[str, int] = {}
+        owasp_version = str(self.stats.get("owasp_version") or "")
         rules: Dict[str, Dict[str, Any]] = {}
         for finding in active:
             by_engine[finding.engine] = by_engine.get(finding.engine, 0) + 1
+            for category in finding.owasp:
+                by_owasp[category.label] = by_owasp.get(category.label, 0) + 1
+                owasp_version = owasp_version or category.version
             entry = rules.get(finding.rule_id)
             if entry is None:
                 rules[finding.rule_id] = {
@@ -340,6 +392,8 @@ class ScanResult:
             "by_severity": self.counts_by_severity(),
             "by_kind": self.counts_by_kind(),
             "by_engine": by_engine,
+            "by_owasp": dict(sorted(by_owasp.items())),
+            "owasp_version": owasp_version,
             "by_ecosystem": dict(self.stats.get("by_ecosystem") or {}),
             "packages": int(self.stats.get("packages_unique") or 0),
             "packages_direct": int(self.stats.get("packages_direct") or 0),

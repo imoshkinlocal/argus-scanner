@@ -203,7 +203,7 @@ def test_markdown_shows_epss_and_kev(tmp_path):
     result.stats["threat_intel"] = threat.apply([finding], threat.ThreatOptions(
         epss_file=epss_path, kev_file=kev_path, cache=False))
     markdown = markdown_report(result)
-    assert "| Severity | Advisory | CWE | EPSS | KEV |" in markdown
+    assert "| Severity | Advisory | CWE | OWASP | EPSS | KEV |" in markdown
     assert "0.974 (100%)" in markdown
     assert "yes (ransomware)" in markdown
     assert "* Threat intel: 1 EPSS match(es), 1 KEV match(es), 1 ransomware-linked" in markdown

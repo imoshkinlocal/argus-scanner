@@ -138,6 +138,27 @@ def test_argparse_defaults_gates(tmp_path):
     assert gates["fail_on"] == "critical"
 
 
+def test_argparse_defaults_owasp(tmp_path):
+    path = tmp_path / "argus.toml"
+    path.write_text(
+        '[scan]\n'
+        'owasp_version = "2025"\n'
+        'owasp_file = "owasp.json"\n'
+        '[report]\n'
+        'owasp = false\n')
+    loaded = config.load(str(path))
+    defaults = config.argparse_defaults(loaded, "scan")
+    assert defaults["owasp_version"] == "2025"
+    assert defaults["owasp_file"] == os.path.join(str(tmp_path), "owasp.json")
+    assert defaults["no_owasp"] is True
+
+    path.write_text('[report]\nowasp = true\nowasp_version = "2017"\n')
+    loaded = config.load(str(path))
+    defaults = config.argparse_defaults(loaded, "scan")
+    assert defaults["no_owasp"] is False
+    assert defaults["owasp_version"] == "2017"
+
+
 def test_argparse_defaults_sbom(tmp_path):
     path = tmp_path / "argus.toml"
     path.write_text(TOML)

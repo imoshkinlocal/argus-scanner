@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 from . import baseline as baseline_module
 from . import enrich as enrich_module
 from . import gates as gates_module
+from . import owasp as owasp_module
 from . import suppress as suppress_module
 from .config import Config
 from .models import ScanResult
@@ -41,6 +42,11 @@ class WorkflowOptions:
     context_lines: int = enrich_module.DEFAULT_CONTEXT_LINES
     snippets: bool = True
     include_suppressed: bool = False
+    #: OWASP Top 10 mapping: enabled by default, edition selected by
+    #: ``owasp_version`` (empty means the bundled default) or ``owasp_file``.
+    owasp: bool = True
+    owasp_version: str = ""
+    owasp_file: Optional[str] = None
 
 
 @dataclasses.dataclass
@@ -57,6 +63,8 @@ class WorkflowSummary:
     snippets: int = 0
     remediation: int = 0
     cwe_names: int = 0
+    owasp: int = 0
+    owasp_version: str = ""
     gate: Optional[gates_module.GateResult] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,6 +80,10 @@ class WorkflowSummary:
                 "snippets": self.snippets,
                 "remediation": self.remediation,
                 "cwe_names": self.cwe_names,
+            },
+            "owasp": {
+                "version": self.owasp_version,
+                "mapped": self.owasp,
             },
         }
         if self.gate is not None:
@@ -113,17 +125,29 @@ def finalize(result: ScanResult, options: Optional[WorkflowOptions] = None) -> W
     summary.suppressed = applied.applied
     summary.expired_suppressions = len(applied.expired)
 
+    owasp_mapping = None
+    if opts.owasp:
+        owasp_mapping = owasp_module.load_mapping(
+            opts.owasp_version or None, opts.owasp_file)
+        summary.owasp_version = owasp_mapping.version
+        result.stats["owasp_version"] = owasp_mapping.version
+    else:
+        result.stats.pop("owasp_version", None)
+
     enriched = enrich_module.enrich(
         result.findings,
         enrich_module.EnrichOptions(
             root=root,
             context_lines=max(0, int(opts.context_lines)),
             snippets=opts.snippets,
+            owasp=bool(opts.owasp),
+            owasp_mapping=owasp_mapping,
         ),
     )
     summary.snippets = enriched["snippets"]
     summary.remediation = enriched["remediation"]
     summary.cwe_names = enriched["cwe"]
+    summary.owasp = enriched.get("owasp", 0)
 
     if opts.baseline_out:
         path = _absolute(opts.baseline_out) or opts.baseline_out

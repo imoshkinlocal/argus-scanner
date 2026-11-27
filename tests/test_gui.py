@@ -58,6 +58,16 @@ def test_format_summary_empty_report():
     assert "Находок: 0" in text
 
 
+def test_format_summary_shows_owasp_distribution():
+    report = {"summary": {
+        "status": "findings", "total": 2, "owasp_version": "2021",
+        "by_owasp": {"A03:2021": 1, "A08:2021": 1},
+        "by_severity": {"high": 2}, "by_kind": {"sast": 2},
+    }}
+    text = gui.format_summary(report)
+    assert "OWASP Top 10 2021: A03:2021 ×1; A08:2021 ×1" in text
+
+
 def test_finding_row_for_sast_and_sca():
     sast = {"severity": "high", "kind": "sast", "rule_id": "java-sqli-jdbc",
             "engine": "argus-java", "message": "unsafe query",
@@ -112,10 +122,30 @@ def test_format_finding_for_sast_includes_location():
     assert "unsafe writer" in text
 
 
+def test_format_finding_shows_owasp_categories():
+    finding = {
+        "severity": "high", "kind": "sast", "rule_id": "java-sqli-jdbc",
+        "message": "unsafe query", "cwe": "CWE-89",
+        "location": {"file": "App.java", "start_line": 1},
+        "owasp": [
+            {"id": "A03:2021", "version": "2021", "name": "Injection",
+             "name_ru": "Инъекции", "url": "https://owasp.org/Top10/A03_2021-Injection/"},
+            {"id": "A07:2021", "version": "2021", "name": "Auth",
+             "name_ru": "Аутентификация"},
+        ],
+    }
+    text = gui.format_finding(finding)
+    assert "OWASP Top 10:" in text
+    assert "• A03:2021 — Инъекции" in text
+    assert "https://owasp.org/Top10/A03_2021-Injection/" in text
+    assert "• A07:2021 — Аутентификация" in text
+
+
 
 def test_help_mentions_core_sections():
     for heading in ("ЧТО ПРОВЕРЯЕТ", "КАК ПОЛЬЗОВАТЬСЯ", "ОПЦИИ",
-                    "ВЫХОДНЫЕ ДАННЫЕ", "ОГРАНИЧЕНИЯ", "ВКЛАДКА «CWE»"):
+                    "ВЫХОДНЫЕ ДАННЫЕ", "ОГРАНИЧЕНИЯ", "ВКЛАДКА «CWE»",
+                    "OWASP TOP 10"):
         assert heading in gui.HELP_TEXT
 
 
@@ -320,6 +350,22 @@ def test_scan_command_without_debian_options_stays_clean():
     assert "--deb-status" not in command
     assert "--deb" not in command
     assert "--deb-suite" not in command
+    assert "--no-owasp" not in command
+    assert "--owasp-version" not in command
+    assert "--owasp-file" not in command
+
+
+def test_scan_command_owasp_options():
+    command = gui.build_scan_command(
+        "/src", "/tmp/r.json", owasp_version="2025",
+        owasp_file="/tmp/mapping.json")
+    assert command[command.index("--owasp-version") + 1] == "2025"
+    assert command[command.index("--owasp-file") + 1] == "/tmp/mapping.json"
+
+    disabled = gui.build_scan_command("/src", "/tmp/r.json", owasp=False,
+                                      owasp_file="/tmp/mapping.json")
+    assert "--no-owasp" in disabled
+    assert "--owasp-file" not in disabled
 
 
 def test_help_mentions_debian_support():

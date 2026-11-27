@@ -218,6 +218,15 @@ argus — SAST + SCA сканер
 • В терминале: `argus cwe`, `argus cwe 79 89`, `argus cwe --search sql`,
   `argus cwe 79 -f md|json`.
 
+OWASP TOP 10
+• Каждая находка с CWE сопоставляется с категорией OWASP Top 10 (A01…A10).
+  В деталях видны категории, названия и ссылки, в сводке — распределение находок.
+• Версия выбирается в окне сканирования: 2017, 2021 (по умолчанию) или 2025.
+  Свой JSON/TOML-файл заменяет встроенный справочник и позволяет обновить
+  сопоставление без пересборки argus.
+• В терминале: `argus owasp`, `argus owasp 89 79`, `argus owasp --version 2025`,
+  `argus owasp 89 -f json`. Отключение: `--no-owasp`.
+
 КОНФИГ, BASELINE И ПОДАВЛЕНИЯ
 • Конфиг — кнопка «…» рядом с полем: argus.toml или argus.json. Без файла argus
   ищет его вверх по дереву (ARGUS_CONFIG тоже учитывается). CLI-флаги важнее
@@ -275,6 +284,8 @@ SBOM, VEX И DIFF
 • Исключить пути — через запятую. Для SAST это подстрока пути (например, tests),
   для SCA — glob по пути манифеста (например, */tests/*).
 • Секреты и IaC включены по умолчанию; отключаются флагами --no-secrets/--no-iac.
+• OWASP Top 10 включён по умолчанию; --owasp-version 2017|2021|2025,
+  --owasp-file PATH и --no-owasp управляют сопоставлением.
 • Инкрементальный кэш Java-анализа включён по умолчанию (--no-sast-cache его
   отключает). Контекст сниппетов задаётся числом строк; 0 = --no-context.
 
@@ -286,20 +297,21 @@ SBOM, VEX И DIFF
 • JSON (schema 1.1) — машиночитаемый отчёт для CI и парсинга. Ключи верхнего
   уровня: summary, stats, findings, errors. В summary: total (активные), all,
   suppressed, new, existing, by_severity (только активные), by_kind, by_engine,
-  by_ecosystem, packages, packages_direct, packages_transitive, packages_unknown,
-  dependency_graph, max_severity, errors, status (findings|clean|error),
+  by_owasp, owasp_version, by_ecosystem, packages, packages_direct, packages_transitive,
+  packages_unknown, dependency_graph, max_severity, errors, status (findings|clean|error),
   top_rules. В stats: dependency_graph, workflow, gate, threat_intel, sast_cache,
   offline_db, secrets/iac. Каждая находка: id, kind (sast|sca), engine, rule_id,
-  severity, cwe, cwe_name, message, remediation, baseline (new|existing),
+  severity, cwe, cwe_name, owasp (id вида A03:2021, названия и ссылка), message,
+  remediation, baseline (new|existing),
   suppressed/suppression, snippet, location (файл и строка) или package
   (имя, версия, fixed_version, purl, direct, depth, licenses), metadata
   (cvss, epss, kev и др.).
 • Markdown — человекочитаемый отчёт: статус, gate/baseline/threat intel,
-  таблицы по severity, сработавшие правила, SAST-находки (файл:строка, CWE,
-  сниппет), SCA-находки (EPSS, KEV, пакет, версия, исправление),
-  remediation, dependency tree и ошибки.
-• SARIF 2.1.0 — для CI-систем: CWE, remediation, baselineState, suppressions и
-  threat-поля в properties.
+  таблицы по severity, распределение OWASP Top 10, сработавшие правила,
+  SAST-находки (файл:строка, CWE, OWASP, сниппет), SCA-находки (EPSS, KEV,
+  пакет, версия, исправление), remediation, dependency tree и ошибки.
+• SARIF 2.1.0 — для CI-систем: CWE, OWASP-теги owasp/aNN-YYYY, remediation,
+  baselineState, suppressions и threat-поля в properties.
 • OpenVEX 0.2.0 — `argus vex report.json`.
 • Коды возврата: 0 — чисто; 1 — есть находки на уровне --fail-on или выше либо
   не пройден quality gate; 2 — ошибка сканирования или неверная подпись SBOM.
@@ -348,6 +360,9 @@ def build_scan_command(
     deb_status: Sequence[str] = (),
     deb_files: Sequence[str] = (),
     deb_suite: Optional[str] = None,
+    owasp: bool = True,
+    owasp_version: str = "2021",
+    owasp_file: Optional[str] = None,
 ) -> List[str]:
     """Return the ``argus scan`` argument vector for the given GUI options."""
     command = [sys.executable, "-m", "argus.cli", "scan", target,
@@ -389,6 +404,13 @@ def build_scan_command(
         command += ["--deb", archive]
     if deb_suite:
         command += ["--deb-suite", deb_suite]
+    if owasp:
+        if owasp_version and owasp_version != "2021":
+            command += ["--owasp-version", owasp_version]
+        if owasp_file:
+            command += ["--owasp-file", owasp_file]
+    else:
+        command.append("--no-owasp")
     return command
 
 
@@ -409,6 +431,13 @@ def format_summary(report: Dict[str, Any]) -> str:
         f"(максимальная severity: {summary.get('max_severity', 'unknown')})",
         f"По severity: {severities}",
         f"По типу: SAST {by_kind.get('sast', 0)}, SCA {by_kind.get('sca', 0)}",
+    ]
+    by_owasp = summary.get("by_owasp") or {}
+    if by_owasp:
+        edition = summary.get("owasp_version") or ""
+        lines.append(f"OWASP Top 10 {edition}: " + "; ".join(
+            f"{label} ×{count}" for label, count in by_owasp.items()))
+    lines.extend([
         f"Движки: {engines}",
         f"Пакетов в инвентаре: {summary.get('packages', 0)}; экосистемы: {ecosystems}",
         f"Классификация: direct {summary.get('packages_direct', 0)}, "
@@ -417,7 +446,7 @@ def format_summary(report: Dict[str, Any]) -> str:
         f"Дерево зависимостей: "
         f"{'построено по lock-файлам' if summary.get('dependency_graph') else 'не восстановлено'}",
         f"Ошибок сканирования: {summary.get('errors', 0)}",
-    ]
+    ])
     rules = summary.get("top_rules") or []
     if rules:
         lines.append("Топ правил: " + "; ".join(
@@ -535,6 +564,18 @@ def format_finding(finding: Dict[str, Any],
             ])
         else:
             lines.append(f"\nCWE: {finding['cwe']}")
+    owasp_categories = finding.get("owasp") or []
+    if owasp_categories:
+        lines.append("\nOWASP Top 10:")
+        for category in owasp_categories:
+            if not isinstance(category, dict):
+                continue
+            label = str(category.get("id") or category.get("label") or "")
+            name = str(category.get("name_ru") or category.get("name") or "")
+            lines.append(f"• {label}" + (f" — {name}" if name else ""))
+            url = str(category.get("url") or "")
+            if url:
+                lines.append(f"  {url}")
     aliases = finding.get("aliases") or []
     if aliases:
         lines.append("Aliases: " + ", ".join(str(alias) for alias in aliases))
@@ -721,6 +762,9 @@ class ArgusApp(tk.Tk):
         self.fail_new_var = tk.BooleanVar(value=False)
         self.secrets_var = tk.BooleanVar(value=True)
         self.iac_var = tk.BooleanVar(value=True)
+        self.owasp_var = tk.BooleanVar(value=True)
+        self.owasp_version_var = tk.StringVar(value="2021")
+        self.owasp_file_var = tk.StringVar()
         self.deb_root_var = tk.StringVar()
         self.deb_status_var = tk.StringVar()
         self.deb_var = tk.StringVar()
@@ -951,13 +995,35 @@ class ArgusApp(tk.Tk):
                         style="Option.Toolbutton",
                         variable=self.iac_var).pack(side="left")
 
+        owasp_row = ttk.Frame(options, style="Card.TFrame")
+        owasp_row.grid(row=4, column=0, sticky="ew", pady=(8, 0))
+        owasp_row.columnconfigure(4, weight=1)
+        ttk.Checkbutton(owasp_row, text="OWASP Top 10", style="Option.Toolbutton",
+                        variable=self.owasp_var).grid(row=0, column=0, sticky="w")
+        ttk.Label(owasp_row, text="Версия:", style="Card.TLabel").grid(
+            row=0, column=1, sticky="e", padx=(16, 0))
+        ttk.Combobox(owasp_row, textvariable=self.owasp_version_var,
+                     values=("2017", "2021", "2025"), state="readonly",
+                     width=8).grid(row=0, column=2, sticky="w", padx=(6, 18))
+        ttk.Label(owasp_row, text="Свой файл:", style="Card.TLabel").grid(
+            row=0, column=3, sticky="e")
+        ttk.Entry(owasp_row, textvariable=self.owasp_file_var).grid(
+            row=0, column=4, sticky="ew", padx=(6, 4))
+        ttk.Button(owasp_row, text="…", width=3,
+                   command=lambda: self._pick_file(
+                       self.owasp_file_var, "Справочник OWASP Top 10",
+                       [("JSON/TOML", "*.json *.toml"), ("Все файлы", "*")])).grid(
+            row=0, column=5)
+
         ttk.Label(
             options, style="CardMuted.TLabel", wraplength=1000, justify="left",
             text=("Порог: находка этого уровня и выше → код 1. min — нижняя граница диапазона, "
                   "skip — только точные версии. Исключения: для SAST подстрока пути, "
                   "для SCA glob по манифесту. Конфиг и baseline можно не указывать — "
-                  "argus найдёт argus.toml рядом с проектом."),
-        ).grid(row=4, column=0, sticky="w", pady=(8, 0))
+                  "argus найдёт argus.toml рядом с проектом. OWASP Top 10 включён по "
+                  "умолчанию (2021); свой JSON/TOML-файл обновляет справочник без "
+                  "пересборки."),
+        ).grid(row=5, column=0, sticky="w", pady=(8, 0))
 
         debian = ttk.LabelFrame(
             parent, text="2b · Пакеты Debian/Ubuntu (dpkg и .deb)",
@@ -1475,7 +1541,10 @@ class ArgusApp(tk.Tk):
             if self.deb_status_var.get().strip() else [],
             deb_files=[item.strip() for item in self.deb_var.get().split(",")
                        if item.strip()],
-            deb_suite=self.deb_suite_var.get().strip() or None)
+            deb_suite=self.deb_suite_var.get().strip() or None,
+            owasp=self.owasp_var.get(),
+            owasp_version=self.owasp_version_var.get().strip() or "2021",
+            owasp_file=self.owasp_file_var.get().strip() or None)
 
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(

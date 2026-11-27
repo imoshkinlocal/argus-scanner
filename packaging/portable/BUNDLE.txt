@@ -1,4 +1,4 @@
-argus 1.3.0 — portable Linux bundle
+argus 1.4.0 — portable Linux bundle
 ==================================
 
 Everything needed to run argus is inside this directory. Nothing is installed
@@ -6,7 +6,7 @@ into the system and nothing is downloaded on the first run.
 
 Versions
 --------
-  argus            1.3.0
+  argus            1.4.0
   Python           3.11.18 (python-build-standalone 20261124, x86_64)
   Semgrep          1.187.0
   tree-sitter      0.26.1
@@ -50,5 +50,5 @@ Semgrep updates
 
 Source of the archive
 ---------------------
-  Built from argus 1.3.0 (py3-none-any wheel) and the pinned wheels listed
+  Built from argus 1.4.0 (py3-none-any wheel) and the pinned wheels listed
   above.  Reproducible with the release workflow in the project repository.

@@ -12,6 +12,7 @@ db update     download the offline OSV archives
 db status     show the content of the local caches
 Rules list    list bundled Semgrep rules
 cwe           browse the built-in CWE reference
+owasp         browse the OWASP Top 10 CWE mapping
 diff          compare two JSON reports (new / fixed / unchanged)
 vex           export SCA findings from a report as OpenVEX
 version       print the tool version
@@ -81,6 +82,13 @@ def _add_output_arguments(parser: argparse.ArgumentParser) -> None:
                         help="source lines around a finding for snippets (default: 2)")
     parser.add_argument("--no-context", action="store_true",
                         help="do not attach source snippets to findings")
+    parser.add_argument("--owasp-version", default="", metavar="VERSION",
+                        help="OWASP Top 10 edition: 2017, 2021 (default) or 2025; "
+                             "with --owasp-file the file's edition wins when omitted")
+    parser.add_argument("--owasp-file", metavar="PATH",
+                        help="custom/updated CWE-to-OWASP mapping (JSON or TOML)")
+    parser.add_argument("--no-owasp", action="store_true",
+                        help="do not map findings to the OWASP Top 10")
 
 
 def _add_sast_arguments(parser: argparse.ArgumentParser) -> None:
@@ -178,6 +186,9 @@ def _workflow_options(args: argparse.Namespace) -> WorkflowOptions:
         context_lines=context,
         snippets=context > 0,
         include_suppressed=bool(getattr(args, "include_suppressed", False)),
+        owasp=not bool(getattr(args, "no_owasp", False)),
+        owasp_version=str(getattr(args, "owasp_version", "") or ""),
+        owasp_file=getattr(args, "owasp_file", None),
     )
 
 
@@ -623,6 +634,110 @@ def _cwe_markdown(entries: Sequence, detailed: bool) -> str:
     return "\n".join(lines)
 
 
+def command_owasp(args: argparse.Namespace) -> int:
+    from . import cwe, owasp
+
+    try:
+        mapping = owasp.load_mapping(args.owasp_version, args.owasp_file)
+    except owasp.OwaspError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    requested = [str(value) for value in getattr(args, "cwe", ())]
+    invalid = [value for value in requested if cwe.normalize_cwe(value) is None]
+    if invalid:
+        print(f"error: not a CWE identifier: {', '.join(invalid)}", file=sys.stderr)
+        return EXIT_ERROR
+    resolved = [(_label, mapping.lookup(_label)) for _label in requested]
+
+    if args.format == "json":
+        payload: Dict[str, Any] = mapping.to_dict()
+        if requested:
+            payload["mapped"] = [
+                {
+                    "cwe": cwe.format_cwe(value),
+                    "cwe_name": cwe.lookup(value).name,
+                    "categories": [category.to_dict() for category in categories],
+                }
+                for value, categories in resolved
+            ]
+        output = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    elif args.format in ("md", "markdown"):
+        output = _owasp_markdown(mapping, resolved)
+    else:
+        output = _owasp_text(mapping, resolved)
+
+    if args.output:
+        _write_report(args.output, output)
+    else:
+        print(output, end="")
+    return EXIT_OK
+
+
+def _owasp_text(mapping, resolved) -> str:
+    from . import cwe
+
+    lines = [f"OWASP Top 10 — {mapping.version}"]
+    if mapping.source:
+        lines.append(f"Источник: {mapping.source}")
+    lines.append("")
+    if not resolved:
+        for category in mapping.categories:
+            name_ru = category.name_ru or category.name
+            lines.append(f"{category.label:10s} {name_ru}")
+            if category.name and category.name != name_ru:
+                lines.append(f"           {category.name}")
+            values = ", ".join(str(number) for number in category.cwes) or "нет"
+            lines.append(f"           CWE ({len(category.cwes)}): {values}")
+        lines.append("")
+        lines.append(f"Всего категорий: {len(mapping.categories)}. "
+                     "Сопоставление: argus owasp <CWE>.")
+        return "\n".join(lines) + "\n"
+    for value, categories in resolved:
+        entry = cwe.lookup(value)
+        label = f"{entry.cwe_id} {entry.name_ru}" if entry is not None else str(value)
+        if not categories:
+            lines.append(f"{label} → не сопоставлен с OWASP Top 10 {mapping.version}")
+            continue
+        for category in categories:
+            lines.append(f"{label} → {category.display_ru}")
+            if category.url:
+                lines.append(f"    {category.url}")
+    return "\n".join(lines) + "\n"
+
+
+def _owasp_markdown(mapping, resolved) -> str:
+    from . import cwe
+
+    lines = [f"# OWASP Top 10 — {mapping.version}", ""]
+    if mapping.source:
+        lines.extend([f"* Источник: <{mapping.source}>", ""])
+    if resolved:
+        lines.extend(["| CWE | OWASP Top 10 |", "| --- | --- |"])
+        for value, categories in resolved:
+            entry = cwe.lookup(value)
+            name = entry.cwe_id if entry is not None else str(value)
+            if entry is not None and entry.name_ru:
+                name = f"{entry.cwe_id} {entry.name_ru}"
+            if not categories:
+                lines.append(f"| {name} | не сопоставлен |")
+                continue
+            labels = "<br>".join(
+                f"[{category.label}]({category.url}) {category.name_ru or category.name}"
+                if category.url else f"{category.label} {category.name_ru or category.name}"
+                for category in categories)
+            lines.append(f"| {name} | {labels} |")
+        lines.append("")
+        return "\n".join(lines)
+    lines.extend(["| Категория | Название | CWE |", "| --- | --- | ---: |"])
+    for category in mapping.categories:
+        label = (f"[{category.label}]({category.url})" if category.url
+                 else category.label)
+        lines.append(f"| {label} | {category.name_ru or category.name} | "
+                     f"{len(category.cwes)} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def command_diff(args: argparse.Namespace) -> int:
     from .baseline import diff_files, render_diff
 
@@ -824,6 +939,21 @@ def build_parser() -> argparse.ArgumentParser:
                             help="text (default), markdown or json")
     cwe_parser.add_argument("-o", "--output", help="write the reference to a file")
     cwe_parser.set_defaults(func=command_cwe)
+
+    owasp_parser = subparsers.add_parser(
+        "owasp", help="browse the OWASP Top 10 CWE mapping")
+    owasp_parser.add_argument("cwe", nargs="*", metavar="CWE",
+                              help="CWE identifier(s) to map, e.g. 89 or CWE-79")
+    owasp_parser.add_argument("--version", "--owasp-version", dest="owasp_version",
+                              default="", metavar="VERSION",
+                              help="OWASP Top 10 edition: 2017, 2021 (default) or 2025")
+    owasp_parser.add_argument("--file", "--owasp-file", dest="owasp_file", metavar="PATH",
+                              help="custom/updated CWE-to-OWASP mapping (JSON or TOML)")
+    owasp_parser.add_argument("-f", "--format", default="text",
+                              choices=("text", "md", "markdown", "json"),
+                              help="text (default), markdown or json")
+    owasp_parser.add_argument("-o", "--output", help="write the reference to a file")
+    owasp_parser.set_defaults(func=command_owasp)
 
     version = subparsers.add_parser("version", help="print tool and backend versions")
     version.set_defaults(func=command_version)

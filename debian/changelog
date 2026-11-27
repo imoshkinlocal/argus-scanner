@@ -1,3 +1,21 @@
+argus-scanner (1.4.0-1) unstable; urgency=medium
+
+  * Map every finding that has a CWE to the OWASP Top 10.  Bundled editions
+    are 2017, 2021 (default) and 2025; a CWE may belong to more than one
+    category (CWE-259 is both A02:2021 and A07:2021).
+  * Expose the mapping in JSON (`finding.owasp`, `summary.by_owasp`,
+    `summary.owasp_version`), SARIF (`owasp/aNN-YYYY` tags and properties),
+    text and Markdown (OWASP column and distribution table) and the GUI
+    (finding details, summary and scan options).
+  * Add `argus owasp` to browse an edition and map CWEs, plus
+    `--owasp-version`, `--owasp-file` and `--no-owasp` for scan/sast/sca.
+  * Ship the catalog as `argus/owasp_top10.json` and add
+    `scripts/update_owasp.py`, so a new OWASP edition can be regenerated from
+    the official OWASP/Top10 repository without changing the code.
+  * Bump the version so the portable archive, wheel and Debian package agree.
+
+ -- Ivan Moshkin <ilevanov1900@gmail.com>  Fri, 27 Nov 2026 18:00:00 +0300
+
 argus-scanner (1.3.0-1) unstable; urgency=medium
 
   * Add the Ubuntu ecosystem next to Debian.  Releases are addressed as

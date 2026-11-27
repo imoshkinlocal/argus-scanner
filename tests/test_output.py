@@ -282,3 +282,60 @@ def test_severity_parsing_aliases():
 def test_finding_fingerprint_is_stable():
     assert sast_finding().fingerprint == sast_finding().fingerprint
     assert sast_finding().fingerprint != sast_finding(start_line=43).fingerprint
+
+
+# --------------------------------------------------------------------------- OWASP Top 10
+
+def _with_owasp(result: ScanResult, version: str = "2021") -> ScanResult:
+    from argus import owasp
+
+    result.stats["owasp_version"] = version
+    owasp.attach(result.findings, owasp.load_builtin(version))
+    return result
+
+
+def test_json_reports_owasp_categories(sample_result):
+    sample_result.findings = [
+        sast_finding(),
+        sca_finding(cwe="CWE-502"),
+    ]
+    _with_owasp(sample_result)
+    payload = json_report(sample_result)
+    sast, sca = payload["findings"]
+    assert sast["owasp"][0]["id"] == "A03:2021"
+    assert sast["owasp"][0]["name_ru"] == "Инъекции"
+    assert sca["owasp"][0]["id"] == "A08:2021"
+    assert payload["summary"]["by_owasp"] == {"A03:2021": 1, "A08:2021": 1}
+    assert payload["summary"]["owasp_version"] == "2021"
+
+
+def test_sarif_tags_and_properties_include_owasp(sample_result):
+    _with_owasp(sample_result)
+    sarif = sarif_report(sample_result, "/tmp/project")
+    run = sarif["runs"][0]
+    tags = run["tool"]["driver"]["rules"][0]["properties"]["tags"]
+    assert "owasp/a03-2021" in tags
+    item = next(r for r in run["results"] if r["ruleId"] == "java-sqli-jdbc")
+    assert item["properties"]["owasp"] == ["A03:2021"]
+    assert item["properties"]["owasp_name"] == ["Injection"]
+    assert item["properties"]["owasp_url"].startswith("https://owasp.org/")
+
+
+def test_text_and_markdown_show_owasp(sample_result):
+    _with_owasp(sample_result)
+    text = text_report(sample_result)
+    assert "owasp: A03:2021 Injection" in text
+    assert "OWASP Top 10 2021: A03:2021 ×1" in text
+
+    markdown = markdown_report(sample_result)
+    assert "## OWASP Top 10" in markdown
+    assert "| [A03:2021](" in markdown
+    assert "| A03:2021 |" in markdown  # the SAST table column
+
+
+def test_no_owasp_data_leaves_reports_unchanged(sample_result):
+    payload = json_report(sample_result)
+    assert "owasp" not in payload["findings"][0]
+    assert payload["summary"]["by_owasp"] == {}
+    assert payload["summary"]["owasp_version"] == ""
+    assert "## OWASP Top 10" not in markdown_report(sample_result)

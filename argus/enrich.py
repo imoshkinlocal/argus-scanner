@@ -13,6 +13,7 @@ import os
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from . import cwe as cwe_module
+from . import owasp as owasp_module
 from .models import Finding, Severity, parse_severity
 
 DEFAULT_CONTEXT_LINES = 2
@@ -70,6 +71,10 @@ class EnrichOptions:
     snippets: bool = True
     remediation: bool = True
     cwe_names: bool = True
+    #: Map findings to the OWASP Top 10.  ``owasp_mapping`` selects the edition
+    #: (or a custom file); ``None`` means the bundled default edition.
+    owasp: bool = True
+    owasp_mapping: Optional[owasp_module.OwaspMapping] = None
 
 
 def read_snippet(path: str, line: int, context: int = DEFAULT_CONTEXT_LINES,
@@ -194,6 +199,12 @@ def attach_cwe_names(findings: Iterable[Finding]) -> int:
     return attached
 
 
+def attach_owasp(findings: Iterable[Finding],
+                 mapping: Optional[owasp_module.OwaspMapping] = None) -> int:
+    """Attach OWASP Top 10 categories, using the bundled default when omitted."""
+    return owasp_module.attach(findings, mapping or owasp_module.load_builtin())
+
+
 def _override_matches(finding: Finding, pattern: str) -> bool:
     text = str(pattern or "").strip()
     if not text:
@@ -239,9 +250,11 @@ def enrich(findings: Iterable[Finding], options: Optional[EnrichOptions] = None)
     """Apply all enrichment steps and return counters."""
     opts = options or EnrichOptions()
     items = list(findings)
-    counts = {"snippets": 0, "remediation": 0, "cwe": 0}
+    counts = {"snippets": 0, "remediation": 0, "cwe": 0, "owasp": 0}
     if opts.cwe_names:
         counts["cwe"] = attach_cwe_names(items)
+    if opts.owasp:
+        counts["owasp"] = attach_owasp(items, opts.owasp_mapping)
     if opts.remediation:
         counts["remediation"] = attach_remediation(items)
     if opts.snippets and opts.context_lines > 0:
@@ -271,6 +284,7 @@ __all__ = [
     "EnrichOptions",
     "apply_severity_overrides",
     "attach_cwe_names",
+    "attach_owasp",
     "attach_remediation",
     "attach_snippets",
     "enrich",

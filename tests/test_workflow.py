@@ -40,6 +40,33 @@ def test_finalize_counts_and_stats():
     assert result.stats["gate"]["passed"] is True
 
 
+def test_finalize_attaches_owasp_categories():
+    result = ScanResult(target="/src")
+    result.findings = [make_sast(), make_sca()]
+    summary = workflow.finalize(result, workflow.WorkflowOptions(
+        root="/src", snippets=False, owasp_version="2025",
+        gate_policy=gates_module.GatePolicy(fail_on="none")))
+    assert summary.owasp == 2
+    assert summary.owasp_version == "2025"
+    by_rule = {finding.rule_id: finding for finding in result.findings}
+    assert [c.label for c in by_rule["java-sqli-jdbc"].owasp] == ["A05:2025"]
+    assert [c.label for c in by_rule["CVE-2021-44228"].owasp] == ["A08:2025"]
+    assert result.stats["owasp_version"] == "2025"
+    assert result.stats["workflow"]["owasp"] == {"version": "2025", "mapped": 2}
+
+
+def test_finalize_can_disable_owasp():
+    result = ScanResult(target="/src")
+    result.findings = [make_sast()]
+    summary = workflow.finalize(result, workflow.WorkflowOptions(
+        root="/src", snippets=False, owasp=False,
+        gate_policy=gates_module.GatePolicy(fail_on="none")))
+    assert summary.owasp == 0
+    assert summary.owasp_version == ""
+    assert result.findings[0].owasp == []
+    assert "owasp_version" not in result.stats
+
+
 def test_finalize_baseline(tmp_path):
     baseline_path = tmp_path / "baseline.json"
     baseline_module.write(str(baseline_path), [make_sast()])

@@ -121,9 +121,10 @@ SCA:
 
 После сканирования `argus/workflow.py` выполняет единый пост-процессинг:
 severity-overrides из конфига → baseline → подавления → обогащение (CWE,
-remediation, сниппеты) → запись нового baseline → quality gate. Порядок
-фиксирован, поэтому `--fail-on-new`, подавления и гейты видят уже
-нормализованные находки.
+OWASP Top 10, remediation, сниппеты) → запись нового baseline → quality gate.
+Порядок фиксирован, поэтому `--fail-on-new`, подавления и гейты видят уже
+нормализованные находки. Маппинг CWE → OWASP Top 10 живёт в `argus/owasp.py`,
+а сам каталог — в `argus/owasp_top10.json` (см. «Справочник OWASP Top 10»).
 
 ## Установка
 
@@ -136,8 +137,8 @@ remediation, сниппеты) → запись нового baseline → qualit
 glibc 2.35+ (Debian 12, Ubuntu 22.04 и новее):
 
 ```bash
-tar xzf argus-1.3.0-linux-x86_64.tar.gz
-cd argus-1.3.0-linux-x86_64
+tar xzf argus-1.4.0-linux-x86_64.tar.gz
+cd argus-1.4.0-linux-x86_64
 ./argus version
 ./argus scan /path/to/repo -f text
 ```
@@ -146,7 +147,7 @@ cd argus-1.3.0-linux-x86_64
 ставится с PyPI при установке.
 
 ```bash
-sudo apt install ./argus-scanner_1.3.0-1_all.deb
+sudo apt install ./argus-scanner_1.4.0-1_all.deb
 ```
 
 Ссылки на файлы — в разделе [Releases](../../releases/latest).
@@ -219,7 +220,7 @@ Debian/Ubuntu: `debian/control`, база dpkg и отдельные `.deb`:
 ```bash
 argus sbom . -f cyclonedx -o src.cdx.json              # debian/control + changelog
 argus sbom . --deb-root / -f cyclonedx -o host.cdx.json  # установленные пакеты
-argus sbom . --deb ./argus-scanner_1.3.0-1_all.deb \
+argus sbom . --deb ./argus-scanner_1.4.0-1_all.deb \
     --deb-suite bookworm -f md -o pkg.md               # один .deb
 argus sca . --deb-root / -f json -o host-vulns.json     # OSV для Debian/Ubuntu
 argus sca . --deb ./pkg.deb --deb-suite jammy           # Ubuntu-пакет
@@ -251,6 +252,9 @@ format = "json"
 summary = "reports/argus.md"
 fail_on = "high"
 baseline = ".argus-baseline.json"
+owasp = true
+owasp_version = "2021"
+# owasp_file = "owasp-top10.json"
 
 [sca]
 threat_intel = true
@@ -328,6 +332,8 @@ argus-gui               # после pip install -e .
   и глубину, а панель деталей можно растянуть мышью или кнопкой
   «Развернуть детали»; по клику виден разбор находки (пакет, путь в графе,
   описание, сниппет кода, рекомендации по исправлению, ссылки) и полный JSON;
+  у находок с CWE показаны категории OWASP Top 10 с названием и ссылкой, а в
+  сводке — распределение находок по категориям;
 * панель фильтров: поиск по тексту, фильтр по типу (SAST/SCA), по CWE,
   переключатели «только новые» и «показать подавленные», группировка по
   severity/типу/CWE/правилу; кликабельные severity-чипы работают как быстрый
@@ -335,8 +341,9 @@ argus-gui               # после pip install -e .
 * сравнение отчётов: кнопка загрузки второго JSON показывает новые, исправленные
   и изменившиеся находки относительно выбранного отчёта;
 * вкладка сканирования принимает `--config`, baseline, `--fail-on-new`,
-  переключатели секретов и IaC, а также число строк контекста — всё это
-  попадает в итоговую команду `argus scan` и видно в журнале;
+  переключатели секретов и IaC, число строк контекста и настройки OWASP
+  (включение, редакция 2017/2021/2025 и свой файл) — всё это попадает в
+  итоговую команду `argus scan` и видно в журнале;
 * сортировка таблиц: клик по заголовку упорядочивает строки, повторный клик
   меняет направление, а стрелка ▲/▼ показывает текущий порядок; severity
   по умолчанию сортируется по убыванию (critical сверху), остальные колонки —
@@ -373,6 +380,7 @@ argus db update        загрузка offline-архивов OSV
 argus db status        состояние локальных кэшей (+ --verify)
 argus rules list       список встроенных правил
 argus cwe <ID...>      встроенный справочник CWE
+argus owasp [CWE...]   справочник и сопоставление OWASP Top 10
 argus diff OLD NEW     сравнение двух JSON-отчётов
 argus vex REPORT       экспорт SCA-находок в OpenVEX
 argus version          версии argus / Python / Semgrep
@@ -396,6 +404,9 @@ argus version          версии argus / Python / Semgrep
 | `--include-suppressed` | показать подавленные находки в text/Markdown/SARIF/GUI |
 | `--context-lines N` | строк контекста вокруг находки (по умолчанию 2) |
 | `--no-context` | не прикреплять сниппеты к находкам |
+| `--owasp-version` | `2017\|2021\|2025`; редакция OWASP Top 10 (по умолчанию 2021) |
+| `--owasp-file PATH` | свой/обновлённый справочник CWE → OWASP (JSON/TOML) |
+| `--no-owasp` | не сопоставлять находки с OWASP Top 10 |
 
 `json` и `sarif` — машиночитаемые форматы для CI и парсинга; `md` и `text` —
 для чтения человеком. `--summary` пишет Markdown рядом с основным отчётом,
@@ -560,6 +571,70 @@ argus cwe 79 -f json           # машинный формат
 «Открыть на cwe.mitre.org». В деталях любой находки CWE расшифровывается
 автоматически.
 
+### OWASP Top 10
+
+Каждая находка, у которой есть CWE, дополнительно сопоставляется с категорией
+OWASP Top 10. Это не отдельный сканер, а слой классификации поверх готового
+отчёта: встроенный каталог `argus/owasp_top10.json` содержит редакции **2017**,
+**2021** (по умолчанию) и **2025**. Один CWE может относиться к нескольким
+категориям — например, CWE-259 в 2021 году попадает и в A02 (криптография), и
+в A07 (аутентификация), поэтому у находки хранится список категорий.
+
+```bash
+argus owasp                    # все категории выбранной редакции
+argus owasp 89 79 502          # CWE → категория
+argus owasp --version 2025 89  # другая редакция
+argus owasp 89 -f md -o owasp.md
+argus owasp --file my-owasp.json 89   # свой справочник
+```
+
+Сопоставление включается автоматически в `scan`/`sast`/`sca` и управляется
+флагами:
+
+| Флаг | Значение |
+| --- | --- |
+| `--owasp-version` | редакция `2017`, `2021` (по умолчанию) или `2025` |
+| `--owasp-file PATH` | свой или обновлённый справочник (JSON/TOML) вместо встроенного |
+| `--no-owasp` | не сопоставлять находки с OWASP Top 10 |
+
+**Обновление справочника без пересборки.** Каталог — обычные данные, а не код.
+Их можно заменить файлом `--owasp-file` или пересобрать встроенную копию из
+официального репозитория `OWASP/Top10`:
+
+```bash
+python scripts/update_owasp.py            # скачать и перезаписать argus/owasp_top10.json
+python scripts/update_owasp.py --check    # только проверить актуальность
+python scripts/update_owasp.py --repo-dir /path/to/OWASP-Top10   # офлайн
+```
+
+Скрипт читает официальные Markdown-страницы каждой категории и собирает
+списки CWE. Свой файл принимает два формата:
+
+```json
+{
+  "version": "2029",
+  "source": "internal",
+  "categories": [
+    {"id": "A01", "name": "Broken Access Control", "name_ru": "Нарушение контроля доступа",
+     "url": "https://owasp.org/…", "cwes": ["CWE-89", 79]},
+    {"id": "A02", "name": "Injection", "name_ru": "Инъекции", "cwes": [89, 564]}
+  ]
+}
+```
+
+Многоредакционный документ повторяет формат встроенного файла:
+`{"default": "2029", "versions": {"2029": {"categories": [...]}, …}}`; в этом
+случае редакцию выбирает `--owasp-version`. Для TOML используется массив
+`[[categories]]` с тем же набором ключей. Незнакомый CWE остаётся без категории
+и не влияет на отчёт; CWE, названия и рекомендации по-прежнему берутся из
+справочника CWE.
+
+Ограничение: официальный документ 2017 года перечисляет только
+представительные CWE у каждой категории, а у A09 своего списка нет. Встроенная
+редакция 2017 воспроизводит документ и дополняет A09 тремя successor-CWE
+(937, 1035, 1104) из списка A06:2021, чтобы находки по зависимостям всё же
+попадали в категорию. Для полного покрытия используйте 2021 или 2025.
+
 ## Конфиг, baseline, подавления и quality gates
 
 Конфиг, baseline, подавления и гейты дают повторяемый прогон в CI. Порядок
@@ -580,10 +655,12 @@ CLI-флаги всегда приоритетнее значений из ко�
 если в системе нет `tomllib`/`tomli`, используется встроенный минимальный
 парсер TOML (секции, массивы, inline-таблицы, строки, числа, boolean).
 
-Секции: `[scan]`, `[sast]`, `[sca]`, `[sbom]`, `[gates]`, `[policies]`,
-`[severity]`, `[diff]` и массив `[[suppress]]`. Имена ключей совпадают с
-длинными флагами CLI (`fail_on`, `baseline`, `exclude`, `threat_intel`,
-`max_total`, …).
+Секции: `[scan]`, `[report]`, `[sast]`, `[sca]`, `[sbom]`, `[gates]`,
+`[policies]`, `[severity]`, `[diff]` и массив `[[suppress]]`. Имена ключей
+совпадают с длинными флагами CLI (`fail_on`, `baseline`, `exclude`,
+`threat_intel`, `max_total`, …). Настройки OWASP (`owasp`, `owasp_version`,
+`owasp_file`) можно задать в `[scan]` или `[report]`; в `[report]` они
+приоритетнее.
 
 ### Baseline
 
@@ -668,7 +745,7 @@ Java-анализ кэшируется в SQLite по содержимому ф�
   "$schema": "https://json.schemastore.org/argus-report-1.1.json",
   "schema_version": "1.1",
   "generated_at": "2026-11-18T09:00:00Z",
-  "tool": {"name": "argus", "version": "1.3.0", "engines": ["argus-java", "osv"]},
+  "tool": {"name": "argus", "version": "1.4.0", "engines": ["argus-java", "osv"]},
   "target": "/abs/path",
   "summary": {
     "total": 2,
@@ -679,6 +756,8 @@ Java-анализ кэшируется в SQLite по содержимому ф�
     "by_severity": {"critical": 1, "high": 1, "medium": 0, "low": 0, "info": 0, "unknown": 0},
     "by_kind": {"sast": 1, "sca": 1},
     "by_engine": {"argus-java": 1, "osv": 1},
+    "by_owasp": {"A03:2021": 1, "A08:2021": 1},
+    "owasp_version": "2021",
     "by_ecosystem": {"Maven": 1},
     "packages": 12,
     "packages_direct": 4,
@@ -698,7 +777,9 @@ Java-анализ кэшируется в SQLite по содержимому ф�
     "packages_total": 15, "packages_unique": 12,
     "packages_direct": 4, "packages_transitive": 8, "packages_unknown": 0,
     "workflow": {"new": 0, "existing": 2, "suppressed": 1,
-                  "expired_suppressions": 0, "severity_overrides": 0},
+                  "expired_suppressions": 0, "severity_overrides": 0,
+                  "enrichment": {"snippets": 2, "remediation": 2, "cwe_names": 2},
+                  "owasp": {"version": "2021", "mapped": 2}},
     "gate": {"passed": true, "violations": [], "considered": 2, "new": 0},
     "threat_intel": {"epss_matches": 1, "kev_matches": 1, "kev_ransomware": 1,
                       "epss_records": 250000, "kev_records": 1200,
@@ -724,6 +805,8 @@ Java-анализ кэшируется в SQLite по содержимому ф�
       "confidence": "high|medium|low",
       "cwe": "CWE-89",
       "cwe_name": "Improper Neutralization of Special Elements used in an SQL Command",
+      "owasp": [{"id": "A03:2021", "version": "2021", "name": "Injection",
+                  "name_ru": "Инъекции", "url": "https://owasp.org/Top10/A03_2021-Injection/"}],
       "message": "…",
       "remediation": ["Use a prepared statement."],
       "suggested_fix": "app.run(debug=False)",
@@ -749,8 +832,10 @@ Java-анализ кэшируется в SQLite по содержимому ф�
 Поля `summary` стабильны и рассчитаны на парсинг: `status` принимает
 `findings` / `clean` / `error`, `total` — число активных находок,
 `all` — включая подавленные, `suppressed` / `new` / `existing` — счётчики
-workflow, `by_severity` считается только по активным, `by_engine` и
-`by_ecosystem` — счётчики по движкам и экосистемам, `packages` — число
+workflow, `by_severity` считается только по активным, `by_engine`,
+`by_owasp` (`A03:2021` → число находок) и `owasp_version` — счётчики по
+движкам, категориям OWASP Top 10 и выбранная редакция, `by_ecosystem` —
+счётчики по экосистемам, `packages` — число
 уникальных пакетов, `packages_direct` / `packages_transitive` /
 `packages_unknown` — классификация, `dependency_graph` — построен ли граф по
 lock-файлам, `top_rules` — до 10 самых частых правил (при равенстве выше по
@@ -766,9 +851,11 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
 * шапка (цель, время, движки, `status`, максимальная severity, качество gate,
   baseline и threat intel, если они включены);
 * таблица по severity и по областям (SAST/SCA/пакеты/ошибки);
+* распределение находок по категориям OWASP Top 10 с названиями и ссылками
+  (секция `## OWASP Top 10`, только когда категории есть);
 * таблица сработавших правил;
-* отдельные таблицы SAST-находок (правило, CWE, файл:строка, движок) и
-  SCA-находок (advisory, CWE, EPSS, KEV, пакет, установленная/исправленная
+* отдельные таблицы SAST-находок (правило, CWE, OWASP, файл:строка, движок) и
+  SCA-находок (advisory, CWE, OWASP, EPSS, KEV, пакет, установленная/исправленная
   версия, манифест) с пометкой `new` относительно baseline;
 * секцию `Remediation` (команды обновления по экосистеме и советы),
   `Suggested fixes` с готовыми заменами из правил (только предложения),
@@ -781,10 +868,12 @@ severity). Полное дерево лежит в `stats.dependency_graph` (`re
 ### SARIF 2.1.0
 
 * `tool.driver.rules` — уникальные правила с `security-severity` и тегами CWE;
+  у находок с OWASP-категориями добавляются теги `owasp/aNN-YYYY`;
 * `runs[0].originalUriBaseIds["%SRCROOT%"]` — абсолютный `file://` корень;
 * для SCA в `properties` добавляются `package`, `version`, `fixed_version`,
   `purl`, `epss`, `epss_percentile`, `kev`, `kev_ransomware`, `kev_due_date`;
 * CWE, `cwe_name`, `remediation` и `baselineState` доступны в `properties`;
+  для OWASP там же лежат `owasp` (`["A03:2021"]`), `owasp_name` и `owasp_url`;
 * если у правила есть `fix`, результат получает `fixes[]` с
   `deletedRegion` и `insertedContent`: это предложение замены для code
   scanning, а не применённое изменение;
@@ -910,7 +999,7 @@ argus sca . --deb ./pkg_2.0-1ubuntu1_amd64.deb --deb-suite jammy --offline
   "version": 1,
   "metadata": {
     "timestamp": "…",
-    "tools": [{"vendor": "argus", "name": "argus", "version": "1.3.0"}],
+    "tools": [{"vendor": "argus", "name": "argus", "version": "1.4.0"}],
     "component": {"type": "application", "name": "my-project"}
   },
   "components": [
@@ -1163,6 +1252,11 @@ precision 4/4 при ожидаемо низком recall вне категор�
   `Ubuntu:<YY.MM>[:LTS]`). Советники Ubuntu Pro/ESM
   (`Ubuntu:Pro:FIPS-*`, `…:esm-*`) пока не запрашиваются: определяется только
   базовый релиз, поэтому версии с ESM-суффиксами могут не найти свою запись.
+* OWASP Top 10 — это классификация, а не проверка: категория появляется только
+  у находки с CWE, поэтому непокрытые CWE (или правила без CWE) остаются без
+  неё. Редакция 2017 в официальном документе перечисляет лишь
+  представительные CWE, а A09 дополнен successor-CWE 937/1035/1104 — для
+  полного покрытия используйте 2021/2025 или свой `--owasp-file`.
 * EPSS/KEV — внешние фиды: их доступность и актуальность не гарантированы.
   При отсутствии сети используется кэш (возможно, устаревший), а причина
   попадает в `stats.threat_intel.errors`. Локальные `--epss-file`/`--kev-file`
@@ -1195,7 +1289,9 @@ SAST-кэш, целостность offline-базы OSV (`--verify`), EPSS/KEV 
 матчинг, кэш, офлайн-файлы, отчёты), вспомогательные функции GUI (сборка
 команды, сводка, строка таблицы, дерево зависимостей, сортировка, фильтры,
 сравнение, разбор находки и путь в графе), справочник CWE (нормализация
-идентификаторов, поиск, покрытие правил, CLI-форматы), структура и валидность
+идентификаторов, поиск, покрытие правил, CLI-форматы), OWASP Top 10
+(встроенные редакции, маппинг CWE, свои JSON/TOML-файлы, CLI и отчёты),
+структура и валидность
 Semgrep-паков (включая прогон правил по уязвимым сэмплам и проверку
 подавления C-шума).
 
@@ -1216,6 +1312,8 @@ argus/
 │   ├── secrets.py             # сканер секретов
 │   ├── iac.py                 # Dockerfile / Kubernetes / Terraform
 │   ├── cwe.py                 # встроенный справочник CWE
+│   ├── owasp.py               # маппинг CWE → OWASP Top 10, свои файлы
+│   ├── owasp_top10.json       # встроенные редакции 2017/2021/2025
 │   ├── models.py              # Finding/ScanResult, severity, dedupe, summary
 │   ├── output/__init__.py     # JSON / SARIF / Markdown / text
 │   ├── sbom.py                # CycloneDX 1.5 / SPDX 2.3 / Markdown, подпись
@@ -1240,6 +1338,7 @@ argus/
 ├── benchmark_results/         # сгенерированные отчёты
 ├── argus-gui.py               # запуск GUI из исходников
 ├── scripts/install.sh
+├── scripts/update_owasp.py    # пересборка argus/owasp_top10.json из OWASP/Top10
 └── tests/
 ```
 

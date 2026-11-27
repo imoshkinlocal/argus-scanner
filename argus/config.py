@@ -100,7 +100,7 @@ _SBOM_KEYS: Dict[str, str] = {
 _PATH_KEYS = {
     "baseline", "baseline_out", "rules", "java_properties", "db_dir",
     "output", "summary", "sast_cache_dir", "epss_file", "kev_file",
-    "threat_cache_dir",
+    "threat_cache_dir", "owasp_file",
 }
 
 _GATE_KEYS = (
@@ -183,7 +183,8 @@ class Config:
         report = self.section("report")
         scan = self.section("scan")
         options: Dict[str, Any] = {}
-        for key in ("context_lines", "include_suppressed", "no_context"):
+        for key in ("context_lines", "include_suppressed", "no_context",
+                    "owasp", "owasp_version", "owasp_file"):
             if key in report:
                 options[key] = report[key]
             elif key in scan:
@@ -432,9 +433,13 @@ def argparse_defaults(config: Config, command: str) -> Dict[str, Any]:
                 defaults[dest] = scan[key]
         for key, dest in (("context_lines", "context_lines"),
                           ("include_suppressed", "include_suppressed"),
-                          ("no_context", "no_context")):
+                          ("no_context", "no_context"),
+                          ("owasp_version", "owasp_version"),
+                          ("owasp_file", "owasp_file")):
             if key in report:
-                defaults[key] = report[key]
+                defaults[dest] = report[key]
+        if "owasp" in report:
+            defaults["no_owasp"] = not bool(report["owasp"])
         if gates.get("fail_on") is not None:
             defaults["fail_on"] = str(gates["fail_on"])
         if gates.get("fail_on_new") is not None:

@@ -1,4 +1,4 @@
-.TH ARGUS 1 "2026-11-27" "argus 1.3.0" "User Commands"
+.TH ARGUS 1 "2026-11-27" "argus 1.4.0" "User Commands"
 .SH NAME
 argus \- SAST and SCA security scanner
 .SH SYNOPSIS
@@ -54,6 +54,11 @@ List the bundled Semgrep rules.
 .B cwe
 Browse the built-in CWE reference.
 .TP
+.B owasp
+Browse the OWASP Top 10 editions (2017, 2021, 2025) or map CWEs to their
+categories.  Use \fB\-\-version\fR to choose an edition and \fB\-\-file\fR for
+a custom JSON/TOML mapping.
+.TP
 .B version
 Print the argus, Python and Semgrep versions.
 .SH OPTIONS
@@ -91,6 +96,18 @@ Load a suppression file (JSON, TOML or .argusignore); may be repeated.
 .TP
 .BR \-\-include\-suppressed
 Show suppressed findings in human-readable and SARIF reports.
+.TP
+.BR \-\-owasp\-version " " \fIVERSION\fR
+Map findings to the OWASP Top 10 edition \fB2017\fR, \fB2021\fR (default) or
+\fB2025\fR.  With \fB\-\-owasp\-file\fR the file's edition wins when omitted.
+.TP
+.BR \-\-owasp\-file " " \fIFILE\fR
+Load a custom or updated CWE-to-OWASP mapping (JSON or TOML) instead of the
+bundled catalog.  A single-edition document is used as-is; a multi-edition
+document needs \fB\-\-owasp\-version\fR.
+.TP
+.BR \-\-no\-owasp
+Do not map findings to the OWASP Top 10.
 .TP
 .BR \-\-exclude " " \fIPATTERN\fR
 Skip paths matching a glob or directory name; may be repeated.
@@ -174,11 +191,19 @@ Run only the static analysis and emit SARIF:
 argus sast ./src -f sarif --fail-on high -o argus.sarif
 .fi
 .PP
-Work without network access:
+Download the offline database, then scan without network access:
 .PP
 .nf
 argus db update
 argus sca . --offline
+.fi
+.PP
+Use the OWASP Top 10 2025 edition and browse the mapping:
+.PP
+.nf
+argus scan . --owasp-version 2025
+argus owasp 89 79
+argus owasp --version 2021 -f md -o owasp.md
 .fi
 .SH SEE ALSO
 .BR argus-gui (1),
