@@ -1178,7 +1178,7 @@ PYTHONPATH=. .venv/bin/python -m pytest tests/ -q
 Те же тесты идут в CI на Python 3.10–3.13, плюс end-to-end demo-скан:
 [workflow tests](../../actions/workflows/ci.yml).
 
-445 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
+436 тестов: taint-движок (источники/стоки/санитайзеры/ветвления/контейнеры,
 Spring MVC-параметры), секреты и IaC, версии и диапазоны OSV, парсеры
 манифестов (включая `Gemfile`/`*.gemspec` и извлечение лицензий/хэшей),
 Debian/Ubuntu (`debian/control`, dpkg status, `.deb`, dpkg-версии, релизы и
