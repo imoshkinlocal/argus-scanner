@@ -112,5 +112,6 @@
 - `argus-scanner_1.1.0-3` — универсальный пакет без вендоринга.
 - `argus-scanner_1.1.0-4` — исправление TOML на Python 3.10 (`tomli`).
 
+[1.3.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.3.0
 [1.2.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.2.0
 [1.1.0]: https://github.com/imoshkinlocal/argus-scanner/releases/tag/v1.1.0
